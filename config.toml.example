@@ -1,0 +1,10 @@
+# Application configuration for website-with-login
+
+[app]
+secret_key = "change-me-for-real-use"
+base_url = "http://localhost:9090"
+
+[oidc]
+issuer = "http://localhost:8080"
+client_id = "website-with-login"
+scopes = ["openid", "profile", "email"]
