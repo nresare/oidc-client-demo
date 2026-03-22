@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>oidc-client-demo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5efe4;
+        --panel: #fffaf2;
+        --text: #22201c;
+        --muted: #6b6258;
+        --accent: #0e6d53;
+        --accent-strong: #084c3a;
+        --border: #ddcfbb;
+      }
+
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      main {
+        max-width: 720px;
+        margin: 4rem auto;
+        padding: 0 1.5rem;
+      }
+
+      .panel {
+        background: rgba(255, 250, 242, 0.92);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 20px 60px rgba(46, 34, 12, 0.08);
+      }
+
+      a.button {
+        display: inline-block;
+        margin-top: 1rem;
+        padding: 0.85rem 1.2rem;
+        border-radius: 999px;
+        background: var(--accent);
+        color: white;
+        text-decoration: none;
+      }
+
+      a.button.secondary {
+        background: transparent;
+        color: var(--accent-strong);
+        border: 1px solid var(--border);
+      }
+
+      .meta {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <p class="meta">Current UTC time: {{ now.isoformat() }}</p>
+        <h1>Small Flask site, real login</h1>
+        {% if user %}
+          <p>You are signed in{% if user.name %} as {{ user.name }}{% endif %}.</p>
+          <a class="button" href="{{ url_for('profile') }}">View profile</a>
+          <a class="button secondary" href="{{ url_for('logout') }}">Sign out</a>
+        {% else %}
+          <p>This site keeps things intentionally small: one public page, one protected page, and OIDC login.</p>
+          <a class="button" href="{{ url_for('login') }}">Sign in with OIDC</a>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

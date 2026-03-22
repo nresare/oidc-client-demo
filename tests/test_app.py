@@ -2,8 +2,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from website_with_login.app import StandaloneApplication, create_app
-from website_with_login.auth import configure_oidc
+from oidc_client_demo.app import StandaloneApplication, create_app
+from oidc_client_demo.auth import configure_oidc
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ client_id = "test-client"
 def test_home_page_shows_login(monkeypatch, config_file):
     oidc_client = Mock()
     monkeypatch.setenv("CONFIG_PATH", str(config_file))
-    monkeypatch.setattr("website_with_login.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
+    monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
     oidc_client.load_server_metadata.return_value = {}
 
     app = create_app()
@@ -42,7 +42,7 @@ def test_home_page_shows_login(monkeypatch, config_file):
 def test_profile_redirects_when_logged_out(monkeypatch, config_file):
     oidc_client = Mock()
     monkeypatch.setenv("CONFIG_PATH", str(config_file))
-    monkeypatch.setattr("website_with_login.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
+    monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
     oidc_client.load_server_metadata.return_value = {}
 
     app = create_app()
@@ -66,7 +66,7 @@ def test_callback_stores_user_in_session(monkeypatch, config_file):
         }
     }
     monkeypatch.setenv("CONFIG_PATH", str(config_file))
-    monkeypatch.setattr("website_with_login.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
+    monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
     oidc_client.load_server_metadata.return_value = {}
 
     app = create_app()
@@ -87,7 +87,7 @@ def test_standalone_application_sets_gunicorn_hooks(monkeypatch, config_file):
     oidc_client = Mock()
     oidc_client.load_server_metadata.return_value = {}
     monkeypatch.setenv("CONFIG_PATH", str(config_file))
-    monkeypatch.setattr("website_with_login.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
+    monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
 
     app = create_app()
     standalone = StandaloneApplication(app, {"bind": "127.0.0.1:8080", "workers": 1})

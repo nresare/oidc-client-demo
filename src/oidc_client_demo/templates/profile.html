@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Your Profile</title>
+    <style>
+      :root {
+        --bg: #f4f7f1;
+        --panel: #ffffff;
+        --text: #1d2a1f;
+        --muted: #59685b;
+        --accent: #3f6c45;
+        --border: #cfdbc9;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      main {
+        max-width: 760px;
+        margin: 4rem auto;
+        padding: 0 1.5rem;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        padding: 2rem;
+        box-shadow: 0 16px 48px rgba(28, 42, 31, 0.08);
+      }
+
+      dt {
+        font-weight: bold;
+        margin-top: 1rem;
+      }
+
+      dd {
+        margin: 0.25rem 0 0;
+        color: var(--muted);
+      }
+
+      a {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <h1>Your profile</h1>
+        <p>This page is protected and rendered from the OIDC session.</p>
+        <dl>
+          <dt>Subject</dt>
+          <dd>{{ user.sub or "Not provided" }}</dd>
+          <dt>Name</dt>
+          <dd>{{ user.name or "Not provided" }}</dd>
+          <dt>Username</dt>
+          <dd>{{ user.preferred_username or "Not provided" }}</dd>
+          <dt>Email</dt>
+          <dd>{{ user.email or "Not provided" }}</dd>
+        </dl>
+        <p><a href="{{ url_for('home') }}">Back home</a> | <a href="{{ url_for('logout') }}">Sign out</a></p>
+      </section>
+    </main>
+  </body>
+</html>

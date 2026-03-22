@@ -1,4 +1,4 @@
-# website-with-login
+# oidc-client-demo
 
 This repo contains a web app intended to illustrate how to authenticate with OpenID Connect.
 It is somewhat inspired by https://github.com/noa-portswigger/flask-lab
@@ -24,7 +24,7 @@ service, with the path /auth/callback appended
 ```bash
 uv sync
 cp config.toml.example config.toml
-uv run website-with-login
+uv run oidc-client-demo
 ```
 
 The app listens on port `8080`.

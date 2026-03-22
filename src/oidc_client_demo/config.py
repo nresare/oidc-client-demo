@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 website-with-login contributors
+# Copyright (c) 2026 oidc-client-demo contributors
 
 import logging
 import tomllib

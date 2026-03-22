@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from website_with_login.config import Config, load_config
+from oidc_client_demo.config import Config, load_config
 
 
 def test_load_config_missing_file():

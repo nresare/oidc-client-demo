@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 website-with-login contributors
+# Copyright (c) 2026 oidc-client-demo contributors
 
 import logging
 import os
@@ -10,8 +10,8 @@ import gunicorn.app.base
 from flask import Flask, redirect, render_template, session, url_for
 from gunicorn.config import Config as GunicornConfig
 
-from website_with_login.auth import configure_oidc, get_oidc_client, get_oidc_metadata, login_required
-from website_with_login.config import load_config
+from oidc_client_demo.auth import configure_oidc, get_oidc_client, get_oidc_metadata, login_required
+from oidc_client_demo.config import load_config
 
 logger = logging.getLogger(__name__)
 

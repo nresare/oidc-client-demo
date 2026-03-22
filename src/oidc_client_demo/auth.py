@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 website-with-login contributors
+# Copyright (c) 2026 oidc-client-demo contributors
 
 from collections.abc import Callable
 from functools import wraps
@@ -8,7 +8,7 @@ from typing import Any
 from authlib.integrations.flask_client import OAuth
 from flask import Flask, redirect, session, url_for
 
-from website_with_login.config import Config, OidcConfig
+from oidc_client_demo.config import Config, OidcConfig
 
 OIDC_CLIENT_EXTENSION = "oidc_client"
 OIDC_METADATA_EXTENSION = "oidc_server_metadata"
