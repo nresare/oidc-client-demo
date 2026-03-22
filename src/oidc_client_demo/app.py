@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def create_app() -> Flask:
     app = Flask(__name__)
 
-    config_path = os.getenv("CONFIG_PATH", "config.toml")
+    config_path = "/config/config.toml"
     config = load_config(config_path)
 
     app.config["SECRET_KEY"] = config.app.secret_key
@@ -116,7 +116,7 @@ def main() -> None:
     logger.info("Starting application")
     app = create_app()
     options = {
-        "bind": "0.0.0.0:9090",
+        "bind": "0.0.0.0:8080",
         "workers": 4,
         "accesslog": "-",
         "errorlog": "-",
