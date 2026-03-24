@@ -2,10 +2,10 @@
 # Copyright (c) 2026 oidc-client-demo contributors
 
 import logging
-import os
 from datetime import UTC, datetime
 from urllib.parse import urlencode
 
+import click
 import gunicorn.app.base
 from flask import Flask, redirect, render_template, session, url_for
 from gunicorn.config import Config as GunicornConfig
@@ -16,10 +16,9 @@ from oidc_client_demo.config import load_config
 logger = logging.getLogger(__name__)
 
 
-def create_app() -> Flask:
+def create_app(config_path: str = "config.toml") -> Flask:
     app = Flask(__name__)
 
-    config_path = "/config/config.toml"
     config = load_config(config_path)
 
     app.config["SECRET_KEY"] = config.app.secret_key
@@ -111,10 +110,18 @@ def setup_logging() -> None:
     root_logger.setLevel(logging.INFO)
 
 
-def main() -> None:
+@click.command()
+@click.option(
+    "--config",
+    "-c",
+    type=click.Path(exists=True),
+    default="config.toml",
+    help="Path to the configuration file.",
+)
+def main(config: str) -> None:
     setup_logging()
     logger.info("Starting application")
-    app = create_app()
+    app = create_app(config)
     options = {
         "bind": "0.0.0.0:8080",
         "workers": 4,
