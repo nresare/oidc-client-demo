@@ -1,102 +1,139 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 oidc-client-demo contributors
 
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlencode
 
 import click
-import gunicorn.app.base
-from flask import Flask, redirect, render_template, session, url_for
-from gunicorn.config import Config as GunicornConfig
+from hypercorn.asyncio import serve
+from hypercorn.config import Config as HypercornConfig
+from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.requests import Request
+from starlette.responses import RedirectResponse, Response
+from starlette.routing import Route
+from starlette.templating import Jinja2Templates
 
-from oidc_client_demo.auth import configure_oidc, get_oidc_client, get_oidc_metadata, login_required
+from oidc_client_demo.auth import (
+    OidcInitializationError,
+    configure_oidc,
+    get_oidc_client,
+    get_oidc_metadata,
+    login_required,
+)
 from oidc_client_demo.config import load_config
 
 logger = logging.getLogger(__name__)
 
+TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
-def create_app(config_path: str = "config.toml") -> Flask:
-    app = Flask(__name__)
 
+async def home(request: Request) -> Response:
+    return TEMPLATES.TemplateResponse(
+        request,
+        "home.html",
+        {
+            "now": datetime.now(UTC),
+            "user": request.session.get("user"),
+        },
+    )
+
+
+async def login(request: Request) -> Response:
+    oidc = get_oidc_client(request.app)
+    redirect_uri = str(request.url_for("auth_callback"))
+    return await oidc.authorize_redirect(request, redirect_uri)
+
+
+async def auth_callback(request: Request) -> Response:
+    oidc = get_oidc_client(request.app)
+    token = await oidc.authorize_access_token(request)
+    user_info = token.get("userinfo")
+    if not user_info:
+        user_info = await oidc.userinfo(token=token)
+
+    request.session["user"] = {
+        "sub": user_info.get("sub"),
+        "preferred_username": user_info.get("preferred_username"),
+        "name": user_info.get("name"),
+        "email": user_info.get("email"),
+    }
+    return RedirectResponse(url=request.url_for("profile"), status_code=302)
+
+
+@login_required
+async def profile(request: Request) -> Response:
+    return TEMPLATES.TemplateResponse(
+        request,
+        "profile.html",
+        {
+            "user": request.session["user"],
+        },
+    )
+
+
+async def logout(request: Request) -> Response:
+    request.session.clear()
+
+    metadata = get_oidc_metadata(request.app)
+    end_session_endpoint = metadata.get("end_session_endpoint")
+    if end_session_endpoint:
+        post_logout_redirect_uri = str(request.url_for("home"))
+        query = urlencode({"post_logout_redirect_uri": post_logout_redirect_uri})
+        return RedirectResponse(url=f"{end_session_endpoint}?{query}", status_code=302)
+
+    return RedirectResponse(url=request.url_for("home"), status_code=302)
+
+
+def create_hypercorn_config() -> HypercornConfig:
+    config = HypercornConfig()
+    config.bind = ["0.0.0.0:8080"]
+    config.accesslog = "-"
+    config.errorlog = "-"
+    return config
+
+
+def create_app(config_path: str = "config.toml") -> Starlette:
     config = load_config(config_path)
 
-    app.config["SECRET_KEY"] = config.app.secret_key
-    app.config["APP_SETTINGS"] = config
-    app.config["BASE_URL"] = config.app.base_url.rstrip("/")
+    @asynccontextmanager
+    async def lifespan(app: Starlette):
+        await configure_oidc(app)
+        yield
 
-    @app.route("/")
-    def home():
-        return render_template(
-            "home.html",
-            now=datetime.now(UTC),
-            user=session.get("user"),
+    middleware = [
+        Middleware(
+            SessionMiddleware,
+            secret_key=config.app.secret_key,
+            https_only=config.app.base_url.startswith("https://"),
         )
+    ]
 
-    @app.route("/login")
-    def login():
-        oidc = get_oidc_client(app)
-        redirect_uri = f"{app.config['BASE_URL']}{url_for('auth_callback')}"
-        return oidc.authorize_redirect(redirect_uri)
-
-    @app.route("/auth/callback")
-    def auth_callback():
-        oidc = get_oidc_client(app)
-        token = oidc.authorize_access_token()
-        user_info = token.get("userinfo")
-        if not user_info:
-            user_info = oidc.userinfo()
-
-        session["user"] = {
-            "sub": user_info.get("sub"),
-            "preferred_username": user_info.get("preferred_username"),
-            "name": user_info.get("name"),
-            "email": user_info.get("email"),
-        }
-        return redirect(url_for("profile"))
-
-    @app.route("/profile")
-    @login_required
-    def profile():
-        return render_template("profile.html", user=session["user"])
-
-    @app.route("/logout")
-    def logout():
-        session.clear()
-
-        metadata = get_oidc_metadata(app)
-        end_session_endpoint = metadata.get("end_session_endpoint")
-        if end_session_endpoint:
-            post_logout_redirect_uri = f"{app.config['BASE_URL']}{url_for('home')}"
-            query = urlencode({"post_logout_redirect_uri": post_logout_redirect_uri})
-            return redirect(f"{end_session_endpoint}?{query}")
-
-        return redirect(url_for("home"))
-
+    app = Starlette(
+        debug=False,
+        routes=[
+            Route("/", home, name="home"),
+            Route("/login", login, name="login"),
+            Route("/auth/callback", auth_callback, name="auth_callback"),
+            Route("/profile", profile, name="profile"),
+            Route("/logout", logout, name="logout"),
+        ],
+        middleware=middleware,
+        lifespan=lifespan,
+    )
+    app.state.settings = config
+    app.state.base_url = config.app.base_url.rstrip("/")
     return app
 
 
-class StandaloneApplication(gunicorn.app.base.BaseApplication):
-    def __init__(self, app: Flask, options: dict[str, str | int]) -> None:
-        self.options = options
-        self.application = app
-        super().__init__()
-
-    def _post_fork(self, server: object, worker: object) -> None:
-        del server
-        del worker
-        configure_oidc(self.application)
-
-    def load_config(self) -> None:
-        for key, value in self.options.items():
-            assert isinstance(self.cfg, GunicornConfig)
-            self.cfg.set(key, value)
-        assert isinstance(self.cfg, GunicornConfig)
-        self.cfg.set("control_socket_disable", True)
-        self.cfg.set("post_fork", self._post_fork)
-
-    def load(self) -> Flask:
-        return self.application
+async def run_server(app: Starlette, config: HypercornConfig | None = None) -> None:
+    await configure_oidc(app)
+    await serve(app, config or create_hypercorn_config())
 
 
 def setup_logging() -> None:
@@ -122,13 +159,10 @@ def main(config: str) -> None:
     setup_logging()
     logger.info("Starting application")
     app = create_app(config)
-    options = {
-        "bind": "0.0.0.0:8080",
-        "workers": 4,
-        "accesslog": "-",
-        "errorlog": "-",
-    }
-    StandaloneApplication(app, options).run()
+    try:
+        asyncio.run(run_server(app))
+    except OidcInitializationError as exc:
+        raise click.ClickException(str(exc)) from None
 
 
 if __name__ == "__main__":
