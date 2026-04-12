@@ -56,12 +56,6 @@
         <h1>Your profile</h1>
         <p>This page is protected and rendered from the OIDC session.</p>
         <dl>
-          <dt>Subject</dt>
-          <dd>{{ user.sub or "Not provided" }}</dd>
-          <dt>Name</dt>
-          <dd>{{ user.name or "Not provided" }}</dd>
-          <dt>Username</dt>
-          <dd>{{ user.preferred_username or "Not provided" }}</dd>
           <dt>Email</dt>
           <dd>{{ user.email or "Not provided" }}</dd>
         </dl>

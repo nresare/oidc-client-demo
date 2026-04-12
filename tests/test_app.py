@@ -29,7 +29,7 @@ def test_home_page_shows_login(monkeypatch, config_file):
     monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
     oidc_client.load_server_metadata.return_value = {}
 
-    app = create_app()
+    app = create_app(str(config_file))
     configure_oidc(app)
     client = app.test_client()
 
@@ -45,7 +45,7 @@ def test_profile_redirects_when_logged_out(monkeypatch, config_file):
     monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
     oidc_client.load_server_metadata.return_value = {}
 
-    app = create_app()
+    app = create_app(str(config_file))
     configure_oidc(app)
     client = app.test_client()
 
@@ -69,7 +69,7 @@ def test_callback_stores_user_in_session(monkeypatch, config_file):
     monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
     oidc_client.load_server_metadata.return_value = {}
 
-    app = create_app()
+    app = create_app(str(config_file))
     configure_oidc(app)
     client = app.test_client()
 
@@ -83,13 +83,65 @@ def test_callback_stores_user_in_session(monkeypatch, config_file):
         assert session["user"]["name"] == "Test User"
 
 
+def test_profile_page_shows_only_email(monkeypatch, config_file):
+    oidc_client = Mock()
+    monkeypatch.setenv("CONFIG_PATH", str(config_file))
+    monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
+    oidc_client.load_server_metadata.return_value = {}
+
+    app = create_app(str(config_file))
+    configure_oidc(app)
+    client = app.test_client()
+
+    with client.session_transaction() as session:
+        session["user"] = {
+            "sub": "abc123",
+            "name": "Test User",
+            "preferred_username": "tester",
+            "email": "test@example.com",
+        }
+
+    response = client.get("/profile")
+
+    assert response.status_code == 200
+    assert b"Email" in response.data
+    assert b"test@example.com" in response.data
+    assert b"Name" not in response.data
+    assert b"Username" not in response.data
+    assert b"Test User" not in response.data
+    assert b"tester" not in response.data
+
+
+def test_home_page_does_not_show_name_when_logged_in(monkeypatch, config_file):
+    oidc_client = Mock()
+    monkeypatch.setenv("CONFIG_PATH", str(config_file))
+    monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
+    oidc_client.load_server_metadata.return_value = {}
+
+    app = create_app(str(config_file))
+    configure_oidc(app)
+    client = app.test_client()
+
+    with client.session_transaction() as session:
+        session["user"] = {
+            "name": "Test User",
+            "email": "test@example.com",
+        }
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b"You are signed in." in response.data
+    assert b"Test User" not in response.data
+
+
 def test_standalone_application_sets_gunicorn_hooks(monkeypatch, config_file):
     oidc_client = Mock()
     oidc_client.load_server_metadata.return_value = {}
     monkeypatch.setenv("CONFIG_PATH", str(config_file))
     monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
 
-    app = create_app()
+    app = create_app(str(config_file))
     standalone = StandaloneApplication(app, {"bind": "127.0.0.1:8080", "workers": 1})
 
     assert standalone.cfg.settings["control_socket_disable"].value is True
