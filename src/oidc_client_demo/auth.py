@@ -1,21 +1,29 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 oidc-client-demo contributors
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import Any
 
-from authlib.integrations.flask_client import OAuth
-from flask import Flask, redirect, session, url_for
+from authlib.integrations.starlette_client import OAuth
+import httpx
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import RedirectResponse, Response
 
 from oidc_client_demo.config import Config, OidcConfig
 
-OIDC_CLIENT_EXTENSION = "oidc_client"
-OIDC_METADATA_EXTENSION = "oidc_server_metadata"
+OIDC_CLIENT_STATE_KEY = "oidc_client"
+OIDC_METADATA_STATE_KEY = "oidc_server_metadata"
 
 
-def register_oidc_client(app: Flask, oidc_config: OidcConfig) -> Any:
-    oauth = OAuth(app)
+class OidcInitializationError(RuntimeError):
+    """Raised when the OIDC client cannot be initialized cleanly."""
+
+
+def register_oidc_client(app: Starlette, oidc_config: OidcConfig) -> Any:
+    del app
+    oauth = OAuth()
     return oauth.register(
         name="oidc",
         client_id=oidc_config.client_id,
@@ -25,36 +33,50 @@ def register_oidc_client(app: Flask, oidc_config: OidcConfig) -> Any:
     )
 
 
-def configure_oidc(app: Flask) -> None:
-    config = app.config["APP_SETTINGS"]
+async def configure_oidc(app: Starlette) -> None:
+    existing_client = getattr(app.state, OIDC_CLIENT_STATE_KEY, None)
+    existing_metadata = getattr(app.state, OIDC_METADATA_STATE_KEY, None)
+    if existing_client is not None and existing_metadata is not None:
+        return
+
+    config = app.state.settings
     assert isinstance(config, Config)
 
     client = register_oidc_client(app, config.oidc)
-    metadata = client.load_server_metadata()
+    try:
+        metadata = await client.load_server_metadata()
+    except httpx.HTTPError as exc:
+        raise OidcInitializationError(
+            "Unable to load OIDC provider metadata from "
+            f"{config.oidc.server_metadata_url}: {exc.__class__.__name__}. "
+            "Check that the issuer URL is correct and reachable."
+        ) from exc
 
-    app.extensions[OIDC_CLIENT_EXTENSION] = client
-    app.extensions[OIDC_METADATA_EXTENSION] = metadata
+    app.state.oidc_client = client
+    app.state.oidc_server_metadata = metadata
 
 
-def get_oidc_client(app: Flask) -> Any:
-    client = app.extensions.get(OIDC_CLIENT_EXTENSION)
+def get_oidc_client(app: Starlette) -> Any:
+    client = getattr(app.state, OIDC_CLIENT_STATE_KEY, None)
     if client is None:
         raise RuntimeError("OIDC client is not initialized for this worker")
     return client
 
 
-def get_oidc_metadata(app: Flask) -> dict[str, Any]:
-    metadata = app.extensions.get(OIDC_METADATA_EXTENSION)
+def get_oidc_metadata(app: Starlette) -> dict[str, Any]:
+    metadata = getattr(app.state, OIDC_METADATA_STATE_KEY, None)
     if metadata is None:
         raise RuntimeError("OIDC metadata is not initialized for this worker")
     return metadata
 
 
-def login_required(view: Callable[..., Any]) -> Callable[..., Any]:
+def login_required(
+    view: Callable[..., Awaitable[Response]],
+) -> Callable[..., Awaitable[Response]]:
     @wraps(view)
-    def wrapped_view(*args: Any, **kwargs: Any) -> Any:
-        if "user" not in session:
-            return redirect(url_for("login"))
-        return view(*args, **kwargs)
+    async def wrapped_view(request: Request, *args: Any, **kwargs: Any) -> Response:
+        if "user" not in request.session:
+            return RedirectResponse(url=request.url_for("login"), status_code=302)
+        return await view(request, *args, **kwargs)
 
     return wrapped_view
