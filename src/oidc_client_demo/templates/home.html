@@ -64,7 +64,7 @@
         <p class="meta">Current UTC time: {{ now.isoformat() }}</p>
         <h1>Small Flask site, real login</h1>
         {% if user %}
-          <p>You are signed in{% if user.name %} as {{ user.name }}{% endif %}.</p>
+          <p>You are signed in.</p>
           <a class="button" href="{{ url_for('profile') }}">View profile</a>
           <a class="button secondary" href="{{ url_for('logout') }}">Sign out</a>
         {% else %}
