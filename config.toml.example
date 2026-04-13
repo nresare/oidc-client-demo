@@ -5,6 +5,6 @@ secret_key = "change-me-for-real-use"
 base_url = "http://localhost:9090"
 
 [oidc]
-issuer = "http://localhost:8080"
+issuer = "https://id.noa.re"
 client_id = "oidc-client-demo"
 scopes = ["openid", "profile", "email"]

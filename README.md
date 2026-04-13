@@ -12,7 +12,7 @@ It is somewhat inspired by https://github.com/noa-portswigger/flask-lab
 ## Configuration
 
 Copy `config.toml.example` to `config.toml` and update the values for your identity provider.
-The identity provider you use needs to supprort PKCE which enables integration without a
+The identity provider you use needs to support PKCE which enables integration without a
 client secret.
 
 You need to register this app with the OpenID connect identity provider you are using. The 
