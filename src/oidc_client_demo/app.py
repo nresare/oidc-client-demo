@@ -6,11 +6,13 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 from urllib.parse import urlencode
 
 import click
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HypercornConfig
+from hypercorn.typing import Framework
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -133,7 +135,7 @@ def create_app(config_path: str = "config.toml") -> Starlette:
 
 async def run_server(app: Starlette, config: HypercornConfig | None = None) -> None:
     await configure_oidc(app)
-    await serve(app, config or create_hypercorn_config())
+    await serve(cast(Framework, app), config or create_hypercorn_config())
 
 
 def setup_logging() -> None:
