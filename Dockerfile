@@ -1,4 +1,4 @@
-FROM dhi.io/uv:0.10.12-debian13-dev AS builder
+FROM dhi.io/uv:0.11-debian13-dev AS builder
 
 WORKDIR /build
 
