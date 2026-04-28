@@ -1,4 +1,4 @@
-FROM dhi.io/uv:0.11-debian13-dev AS builder
+FROM astral/uv:trixie-slim AS builder
 
 WORKDIR /build
 
