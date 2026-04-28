@@ -1,6 +1,6 @@
 [project]
 name = "oidc-client-demo"
-dynamic = ["version"]
+version = "0.1.0"
 description = "A minimal Starlette website with OIDC login"
 license = "MIT"
 requires-python = ">=3.11"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling>=1.27.0", "hatch-vcs>=0.4.0"]
+requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
 [project.scripts]
@@ -31,12 +31,6 @@ dev = [
 
 [tool.uv]
 package = true
-
-[tool.hatch.version]
-source = "vcs"
-
-[tool.hatch.build.hooks.vcs]
-version-file = "src/oidc_client_demo/_version.py"
 
 [tool.ruff]
 line-length = 120
