@@ -26,6 +26,7 @@ dev = [
     "httpx",
     "pytest",
     "ruff",
+    "ty>=0.0.33",
 ]
 
 [tool.uv]
