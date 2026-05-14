@@ -35,6 +35,10 @@ logger = logging.getLogger(__name__)
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
+def external_url(request: Request, path: str) -> str:
+    return f"{request.app.state.base_url}{path}"
+
+
 async def home(request: Request) -> Response:
     return TEMPLATES.TemplateResponse(
         request,
@@ -48,7 +52,7 @@ async def home(request: Request) -> Response:
 
 async def login(request: Request) -> Response:
     oidc = get_oidc_client(request.app)
-    redirect_uri = str(request.url_for("auth_callback"))
+    redirect_uri = external_url(request, "/auth/callback")
     return await oidc.authorize_redirect(request, redirect_uri)
 
 
@@ -85,7 +89,7 @@ async def logout(request: Request) -> Response:
     metadata = get_oidc_metadata(request.app)
     end_session_endpoint = metadata.get("end_session_endpoint")
     if end_session_endpoint:
-        post_logout_redirect_uri = str(request.url_for("home"))
+        post_logout_redirect_uri = external_url(request, "/")
         query = urlencode({"post_logout_redirect_uri": post_logout_redirect_uri})
         return RedirectResponse(url=f"{end_session_endpoint}?{query}", status_code=302)
 

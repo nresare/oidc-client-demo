@@ -1,7 +1,9 @@
 from unittest.mock import AsyncMock, Mock
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 import httpx
+from starlette.responses import Response
 from starlette.testclient import TestClient
 
 from oidc_client_demo.app import create_app, create_hypercorn_config, run_server
@@ -35,10 +37,26 @@ def oidc_client():
     return client
 
 
-def create_test_client(monkeypatch, config_file, oidc_client):
+def create_test_client(monkeypatch, config_file, oidc_client, base_url: str = "http://testserver"):
     monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
     app = create_app(str(config_file))
-    return TestClient(app)
+    return TestClient(app, base_url=base_url)
+
+
+def write_config(tmp_path, base_url: str):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        f"""
+[app]
+secret_key = "test-secret"
+base_url = "{base_url}"
+
+[oidc]
+issuer = "http://localhost:9000"
+client_id = "test-client"
+""".strip()
+    )
+    return config_path
 
 
 def login_user(client: TestClient, oidc_client: Mock, userinfo: dict[str, str]) -> None:
@@ -121,6 +139,31 @@ def test_home_page_does_not_show_name_when_logged_in(monkeypatch, config_file, o
     assert response.status_code == 200
     assert "You are signed in." in response.text
     assert "Test User" not in response.text
+
+
+def test_login_uses_configured_base_url_for_redirect_uri(monkeypatch, tmp_path, oidc_client):
+    config_file = write_config(tmp_path, "https://demo.resare.com")
+    oidc_client.authorize_redirect.return_value = Response(status_code=204)
+
+    with create_test_client(monkeypatch, config_file, oidc_client, base_url="http://demo.resare.com") as client:
+        response = client.get("/login")
+
+    assert response.status_code == 204
+    oidc_client.authorize_redirect.assert_awaited_once()
+    assert oidc_client.authorize_redirect.call_args.args[1] == "https://demo.resare.com/auth/callback"
+
+
+def test_logout_uses_configured_base_url_for_post_logout_redirect(monkeypatch, tmp_path, oidc_client):
+    config_file = write_config(tmp_path, "https://demo.resare.com/")
+    oidc_client.load_server_metadata.return_value = {"end_session_endpoint": "https://idp.example/logout"}
+
+    with create_test_client(monkeypatch, config_file, oidc_client, base_url="http://demo.resare.com") as client:
+        response = client.get("/logout", follow_redirects=False)
+
+    assert response.status_code == 302
+    location = urlparse(response.headers["location"])
+    query = parse_qs(location.query)
+    assert query["post_logout_redirect_uri"] == ["https://demo.resare.com/"]
 
 
 def test_create_hypercorn_config_sets_runtime_defaults():
