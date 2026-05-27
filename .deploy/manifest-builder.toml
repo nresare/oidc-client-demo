@@ -1,0 +1,5 @@
+[[website]]
+name = "demo.resare.com"
+namespace = "demo"
+args = ["-c", "/config/config.toml"]
+config = { "/config/config.toml" = "oidc-client-demo.toml" }
