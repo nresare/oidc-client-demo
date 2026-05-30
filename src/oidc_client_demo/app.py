@@ -18,7 +18,8 @@ from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
-from starlette.routing import Route
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
 from oidc_client_demo.auth import (
@@ -133,6 +134,7 @@ def create_app(config_path: str = "config.toml") -> Starlette:
             Route("/auth/callback", auth_callback, name="auth_callback"),
             Route("/profile", profile, name="profile"),
             Route("/logout", logout, name="logout"),
+            Mount("/static", StaticFiles(packages=[("oidc_client_demo", "static")]), name="static"),
         ],
         middleware=middleware,
         lifespan=lifespan,

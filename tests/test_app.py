@@ -82,6 +82,15 @@ def test_healthz_returns_ok(monkeypatch, config_file, oidc_client):
     assert response.json() == {"status": "ok"}
 
 
+def test_static_stylesheet_is_served_from_package(monkeypatch, config_file, oidc_client):
+    with create_test_client(monkeypatch, config_file, oidc_client) as client:
+        response = client.get("/static/site.css")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/css")
+    assert ":root" in response.text
+
+
 def test_profile_redirects_when_logged_out(monkeypatch, config_file, oidc_client):
     with create_test_client(monkeypatch, config_file, oidc_client) as client:
         response = client.get("/profile", follow_redirects=False)
