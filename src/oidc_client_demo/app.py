@@ -17,7 +17,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
 from starlette.templating import Jinja2Templates
 
@@ -48,6 +48,10 @@ async def home(request: Request) -> Response:
             "user": request.session.get("user"),
         },
     )
+
+
+async def healthz(request: Request) -> Response:
+    return JSONResponse({"status": "ok"})
 
 
 async def login(request: Request) -> Response:
@@ -124,6 +128,7 @@ def create_app(config_path: str = "config.toml") -> Starlette:
         debug=False,
         routes=[
             Route("/", home, name="home"),
+            Route("/healthz", healthz, name="healthz"),
             Route("/login", login, name="login"),
             Route("/auth/callback", auth_callback, name="auth_callback"),
             Route("/profile", profile, name="profile"),
