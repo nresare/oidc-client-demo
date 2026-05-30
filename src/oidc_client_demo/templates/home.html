@@ -119,7 +119,7 @@
     <main>
       <section class="hero">
         <p class="eyebrow">OIDC client demo</p>
-        <h1>Small Flask site, real login</h1>
+        <h1>Small starlette site, real login</h1>
         {% if user %}
           <p class="lede">You are signed in.</p>
           <div class="actions">
@@ -127,7 +127,7 @@
             <a class="button" href="{{ url_for('logout') }}">Sign out</a>
           </div>
         {% else %}
-          <p class="lede">This site keeps things intentionally small: one public page, one protected page, and OIDC login.</p>
+          <p class="lede">The purpose of this site is to illustrate the OpenId Connect (OIDC) protocol for logins.</p>
           <div class="actions">
             <a class="button" href="{{ url_for('login') }}">Sign in with OIDC</a>
           </div>
