@@ -98,7 +98,7 @@ def test_profile_redirects_when_logged_out(monkeypatch, config_file, oidc_client
         response = client.get("/profile", follow_redirects=False)
 
     assert response.status_code == 302
-    assert response.headers["location"].endswith("/login")
+    assert response.headers["location"] == "/login"
 
 
 def test_callback_stores_user_in_session(monkeypatch, config_file, oidc_client):
@@ -116,7 +116,7 @@ def test_callback_stores_user_in_session(monkeypatch, config_file, oidc_client):
         profile_response = client.get("/profile")
 
     assert response.status_code == 302
-    assert response.headers["location"].endswith("/profile")
+    assert response.headers["location"] == "/profile"
     assert profile_response.status_code == 200
     assert "test@example.com" in profile_response.text
 
@@ -202,3 +202,15 @@ async def test_run_server_wraps_oidc_startup_errors(monkeypatch, config_file, oi
 
     with pytest.raises(OidcInitializationError, match="Unable to load OIDC provider metadata"):
         await run_server(app, create_hypercorn_config())
+
+
+@pytest.mark.parametrize(
+    "route, destination", [("/auth/callback", "/profile"), ("/profile", "/login"), ("/logout", "/")]
+)
+def test_local_redirects_preserve_public_origin(monkeypatch, tmp_path, oidc_client, route, destination):
+    config_file = write_config(tmp_path, "https://demo.resare.com")
+    oidc_client.authorize_access_token.return_value = {"userinfo": {"email": "test@example.com"}}
+    with create_test_client(monkeypatch, config_file, oidc_client, base_url="http://demo.resare.com") as client:
+        response = client.get(route, follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["location"] == destination
