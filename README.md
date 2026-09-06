@@ -23,8 +23,20 @@ service, with the path /auth/callback appended
 
 ```bash
 uv sync
+umask 077
+uv run python -c 'import secrets; print(secrets.token_urlsafe(32))' > session-key
 cp config.toml.example config.toml
 uv run oidc-client-demo
 ```
 
 The app listens on port `8080`.
+
+Set `app.secret_key_path` to a UTF-8 file containing the session signing key.
+Relative paths are resolved from the configuration file's directory. Leading and
+trailing whitespace is stripped; missing or empty files prevent startup. Inline
+`app.secret_key` values are no longer supported. Keep the key stable across restarts
+to preserve sessions; replacing it invalidates existing sessions.
+
+The deployment manifest requests `random-secret = "session-key"`, which mounts the
+generated key at `/random-secrets/session-key`. The deployment configuration uses
+that path.

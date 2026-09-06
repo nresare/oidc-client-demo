@@ -1,7 +1,7 @@
 # Application configuration for oidc-client-demo
 
 [app]
-secret_key = "change-me-for-real-use"
+secret_key_path = "session-key"
 base_url = "http://localhost:9090"
 
 [oidc]

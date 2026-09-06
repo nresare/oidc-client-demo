@@ -1,7 +1,7 @@
 # Application configuration for oidc-client-demo
 
 [app]
-secret_key = "F6CtWWwVLCXxgrchWjygTNzN"
+secret_key_path = "/random-secrets/session-key"
 base_url = "https://demo.resare.com"
 
 [oidc]
