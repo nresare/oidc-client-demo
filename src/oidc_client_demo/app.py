@@ -74,7 +74,7 @@ async def auth_callback(request: Request) -> Response:
         "name": user_info.get("name"),
         "email": user_info.get("email"),
     }
-    return RedirectResponse(url=request.url_for("profile"), status_code=302)
+    return RedirectResponse(url="/profile", status_code=302)
 
 
 @login_required
@@ -98,7 +98,7 @@ async def logout(request: Request) -> Response:
         query = urlencode({"post_logout_redirect_uri": post_logout_redirect_uri})
         return RedirectResponse(url=f"{end_session_endpoint}?{query}", status_code=302)
 
-    return RedirectResponse(url=request.url_for("home"), status_code=302)
+    return RedirectResponse(url="/", status_code=302)
 
 
 def create_hypercorn_config() -> HypercornConfig:

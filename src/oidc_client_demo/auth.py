@@ -76,7 +76,7 @@ def login_required(
     @wraps(view)
     async def wrapped_view(request: Request, *args: Any, **kwargs: Any) -> Response:
         if "user" not in request.session:
-            return RedirectResponse(url=request.url_for("login"), status_code=302)
+            return RedirectResponse(url="/login", status_code=302)
         return await view(request, *args, **kwargs)
 
     return wrapped_view

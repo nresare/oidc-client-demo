@@ -14,13 +14,13 @@
         {% if user %}
           <p class="lede">You are signed in.</p>
           <div class="actions">
-            <a class="button" href="{{ url_for('profile') }}">View profile</a>
-            <a class="button" href="{{ url_for('logout') }}">Sign out</a>
+            <a class="button" href="/profile">View profile</a>
+            <a class="button" href="/logout">Sign out</a>
           </div>
         {% else %}
           <p class="lede">The purpose of this site is to illustrate the OpenId Connect (OIDC) protocol for logins.</p>
           <div class="actions">
-            <a class="button" href="{{ url_for('login') }}">Sign in with OIDC</a>
+            <a class="button" href="/login">Sign in with OIDC</a>
           </div>
         {% endif %}
         <p class="meta">Current UTC time: {{ now.isoformat() }}</p>
