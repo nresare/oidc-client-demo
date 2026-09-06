@@ -12,11 +12,12 @@ from oidc_client_demo.auth import OidcInitializationError
 
 @pytest.fixture
 def config_file(tmp_path):
+    (tmp_path / "session-key").write_text("test-secret")
     config_path = tmp_path / "config.toml"
     config_path.write_text(
         """
 [app]
-secret_key = "test-secret"
+secret_key_path = "session-key"
 base_url = "http://localhost:8080"
 
 [oidc]
@@ -44,11 +45,12 @@ def create_test_client(monkeypatch, config_file, oidc_client, base_url: str = "h
 
 
 def write_config(tmp_path, base_url: str):
+    (tmp_path / "session-key").write_text("test-secret")
     config_path = tmp_path / "config.toml"
     config_path.write_text(
         f"""
 [app]
-secret_key = "test-secret"
+secret_key_path = "session-key"
 base_url = "{base_url}"
 
 [oidc]

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AppConfig:
-    secret_key: str = "change-me-for-real-use"
+    secret_key: str
     base_url: str = "http://localhost:8080"
 
 
@@ -49,9 +49,21 @@ def load_config(config_path: str) -> Config:
     if missing_fields:
         raise ValueError(f"Missing required OIDC configuration fields: {', '.join(missing_fields)}")
 
+    if "secret_key" in app_data:
+        raise ValueError("app.secret_key is no longer supported; use app.secret_key_path")
+    secret_key_path = app_data.get("secret_key_path")
+    if not isinstance(secret_key_path, str) or not secret_key_path.strip():
+        raise ValueError("Missing or invalid app.secret_key_path")
+    secret_path = Path(secret_key_path)
+    if not secret_path.is_absolute():
+        secret_path = path.parent / secret_path
+    secret_key = secret_path.read_text(encoding="utf-8").strip()
+    if not secret_key:
+        raise ValueError(f"Secret key file is empty: {secret_path}")
+
     return Config(
         app=AppConfig(
-            secret_key=app_data.get("secret_key", "change-me-for-real-use"),
+            secret_key=secret_key,
             base_url=app_data.get("base_url", "http://localhost:8080"),
         ),
         oidc=OidcConfig(
