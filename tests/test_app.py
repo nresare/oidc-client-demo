@@ -1,8 +1,8 @@
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlparse
 
+import httpx2
 import pytest
-import httpx
 from starlette.responses import Response
 from starlette.testclient import TestClient
 
@@ -194,7 +194,7 @@ def test_create_hypercorn_config_sets_runtime_defaults():
 
 @pytest.mark.anyio
 async def test_run_server_wraps_oidc_startup_errors(monkeypatch, config_file, oidc_client):
-    oidc_client.load_server_metadata.side_effect = httpx.ConnectTimeout("timed out")
+    oidc_client.load_server_metadata.side_effect = httpx2.ConnectTimeout("timed out")
     monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
     app = create_app(str(config_file))
 

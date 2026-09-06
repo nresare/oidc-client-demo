@@ -5,8 +5,8 @@ from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import Any
 
+import httpx2
 from authlib.integrations.starlette_client import OAuth
-import httpx
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
@@ -45,7 +45,7 @@ async def configure_oidc(app: Starlette) -> None:
     client = register_oidc_client(app, config.oidc)
     try:
         metadata = await client.load_server_metadata()
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         raise OidcInitializationError(
             "Unable to load OIDC provider metadata from "
             f"{config.oidc.server_metadata_url}: {exc.__class__.__name__}. "
