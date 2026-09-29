@@ -3,3 +3,4 @@ name = "demo.resare.com"
 args = ["-c", "/config/config.toml"]
 config = { "/config/config.toml" = "oidc-client-demo.toml" }
 random-secret = "session-key"
+external-secret = "/secret"
