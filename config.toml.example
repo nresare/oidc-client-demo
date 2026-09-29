@@ -2,9 +2,12 @@
 
 [app]
 secret_key_path = "session-key"
-base_url = "http://localhost:9090"
+base_url = "http://localhost:8080"
 
 [oidc]
 issuer = "https://id.noa.re"
 client_id = "oidc-client-demo"
 scopes = ["openid", "profile", "email"]
+# For Microsoft Entra, add "offline_access" and "https://graph.microsoft.com/User.Read".
+# Register the callback as a Web redirect URI and put the web app credential in this file:
+# client_secret_path = "client-secret"

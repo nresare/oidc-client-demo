@@ -20,6 +20,33 @@
           <dd>{{ user.email or "Not provided" }}</dd>
         </dl>
       </section>
+      <section class="profile-details" aria-labelledby="token-details-title">
+        <h2 id="token-details-title">Token experiment</h2>
+        {% if token %}
+          <dl>
+            <dt>Access token</dt><dd>{{ "Present" if token.access_token else "Missing" }}</dd>
+            <dt>Access token expires</dt><dd>{{ token.expires_at.isoformat() if token.expires_at else "Not reported" }}</dd>
+            <dt>Refresh token</dt><dd>{{ "Present" if token.refresh_token else "Missing" }}</dd>
+            <dt>Granted scopes</dt><dd>{{ token.scope or "Not reported" }}</dd>
+          </dl>
+          {% if token.last_refresh %}<p class="meta">{{ token.last_refresh }}</p>{% endif %}
+          {% if token.last_graph %}<p class="meta">{{ token.last_graph }}</p>{% endif %}
+          <div class="actions">
+            <form action="/refresh" method="post">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="button" type="submit">Refresh now</button>
+            </form>
+            <form action="/graph-me" method="post">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="button" type="submit">Call Microsoft Graph /me</button>
+            </form>
+            <a class="button" href="/login">Start a new sign-in</a>
+          </div>
+          <p class="meta">Refresh sends the stored token directly from this server to Entra. A Graph HTTP 200 confirms the access token works for User.Read.</p>
+        {% else %}
+          <p class="meta">The server has no token record for this session. Sign in again to start the experiment.</p>
+        {% endif %}
+      </section>
       <section class="actions" aria-label="Profile actions">
         <a class="button" href="/">Back home</a>
         <a class="button" href="/logout">Sign out</a>

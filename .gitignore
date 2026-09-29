@@ -4,3 +4,4 @@ __pycache__/
 /config.toml
 _version.py
 /session-key
+/client-secret

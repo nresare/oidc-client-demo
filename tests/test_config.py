@@ -61,3 +61,12 @@ def test_load_config_requires_oidc_fields(tmp_path):
     config_path.write_text('[oidc]\nissuer = "http://localhost:9000"\n')
     with pytest.raises(ValueError, match="Missing required OIDC configuration fields: client_id"):
         load_config(str(config_path))
+
+
+def test_load_config_reads_oidc_client_secret_from_file(tmp_path):
+    (tmp_path / "session-key").write_text("test-secret")
+    (tmp_path / "client-secret").write_text("entra-secret\n")
+    config_path = write_config(tmp_path)
+    with open(config_path, "a") as config_file:
+        config_file.write('client_secret_path = "client-secret"\n')
+    assert load_config(config_path).oidc.client_secret == "entra-secret"

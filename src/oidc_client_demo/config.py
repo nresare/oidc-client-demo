@@ -19,6 +19,7 @@ class AppConfig:
 class OidcConfig:
     issuer: str
     client_id: str
+    client_secret: str | None = None
     scopes: list[str] = field(default_factory=lambda: ["openid", "profile", "email"])
 
     @property
@@ -61,6 +62,20 @@ def load_config(config_path: str) -> Config:
     if not secret_key:
         raise ValueError(f"Secret key file is empty: {secret_path}")
 
+    client_secret = None
+    if "client_secret" in oidc_data:
+        raise ValueError("oidc.client_secret is not supported; use oidc.client_secret_path")
+    client_secret_path = oidc_data.get("client_secret_path")
+    if client_secret_path is not None:
+        if not isinstance(client_secret_path, str) or not client_secret_path.strip():
+            raise ValueError("Invalid oidc.client_secret_path")
+        client_secret_file = Path(client_secret_path)
+        if not client_secret_file.is_absolute():
+            client_secret_file = path.parent / client_secret_file
+        client_secret = client_secret_file.read_text(encoding="utf-8").strip()
+        if not client_secret:
+            raise ValueError(f"Client secret file is empty: {client_secret_file}")
+
     return Config(
         app=AppConfig(
             secret_key=secret_key,
@@ -69,6 +84,7 @@ def load_config(config_path: str) -> Config:
         oidc=OidcConfig(
             issuer=oidc_data["issuer"],
             client_id=oidc_data["client_id"],
+            client_secret=client_secret,
             scopes=oidc_data.get("scopes", ["openid", "profile", "email"]),
         ),
     )
