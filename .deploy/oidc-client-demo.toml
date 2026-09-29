@@ -5,6 +5,7 @@ secret_key_path = "/random-secrets/session-key"
 base_url = "https://demo.resare.com"
 
 [oidc]
-issuer = "https://id.noa.re"
-client_id = "oidc-client-demo"
-scopes = ["openid", "profile", "email"]
+issuer = "https://login.microsoftonline.com/1b5955bf-2426-4ced-8412-9fe81bb8bca4/v2.0"
+client_id = "82121173-5d45-4932-9067-8872b8735206"
+scopes = ["openid", "profile", "email", "offline_access", "https://graph.microsoft.com/User.Read"]
+client_seret_path = "/secret/client_id"
