@@ -8,6 +8,12 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+CONFIG_PARAMETERS = {
+    # Keep deprecated names here so their existing, more specific errors still apply.
+    "app": {"secret_key", "secret_key_path", "base_url"},
+    "oidc": {"issuer", "client_id", "client_secret", "client_secret_path", "scopes"},
+}
+
 
 @dataclass
 class AppConfig:
@@ -41,6 +47,15 @@ def load_config(config_path: str) -> Config:
     logger.info("Loading config from: %s", config_path)
     with open(path, "rb") as f:
         data = tomllib.load(f)
+
+    unknown = []
+    for section, values in data.items():
+        if section not in CONFIG_PARAMETERS:
+            unknown.append(section)
+        elif isinstance(values, dict):
+            unknown.extend(f"{section}.{key}" for key in values if key not in CONFIG_PARAMETERS[section])
+    if unknown:
+        raise ValueError(f"Unknown configuration parameter(s): {', '.join(sorted(unknown))}")
 
     app_data = data.get("app", {})
     oidc_data = data.get("oidc", {})

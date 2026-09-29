@@ -13,6 +13,7 @@ It is somewhat inspired by https://github.com/noa-portswigger/flask-lab
 ## Configuration
 
 Copy `config.toml.example` to `config.toml` and update the values for your identity provider.
+Unknown configuration sections and parameters cause startup to fail with their names in the error.
 The identity provider you use needs to support PKCE which enables integration without a
 client secret.
 

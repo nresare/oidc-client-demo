@@ -70,3 +70,28 @@ def test_load_config_reads_oidc_client_secret_from_file(tmp_path):
     with open(config_path, "a") as config_file:
         config_file.write('client_secret_path = "client-secret"\n')
     assert load_config(config_path).oidc.client_secret == "entra-secret"
+
+
+@pytest.mark.parametrize(
+    ("extra_config", "unknown_parameter"),
+    [
+        ('\nclient_seret_path = "/secret/client-secret"', "oidc.client_seret_path"),
+        ('\n[extra]\nvalue = "ignored"', "extra"),
+    ],
+)
+def test_load_config_rejects_unknown_parameters(tmp_path, extra_config, unknown_parameter):
+    config_path = write_config(tmp_path)
+    with open(config_path, "a") as config_file:
+        config_file.write(extra_config)
+
+    with pytest.raises(ValueError) as exc_info:
+        load_config(config_path)
+    assert str(exc_info.value) == f"Unknown configuration parameter(s): {unknown_parameter}"
+
+
+def test_load_config_rejects_unknown_app_parameter(tmp_path):
+    config_path = write_config(tmp_path, 'secret_key_path = "session-key"\nsecreet_key_path = "session-key"')
+
+    with pytest.raises(ValueError) as exc_info:
+        load_config(config_path)
+    assert str(exc_info.value) == "Unknown configuration parameter(s): app.secreet_key_path"
