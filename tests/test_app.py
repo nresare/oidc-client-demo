@@ -1,3 +1,4 @@
+import re
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlparse
 
@@ -67,6 +68,13 @@ def login_user(client: TestClient, oidc_client: Mock, userinfo: dict[str, str]) 
     assert response.status_code == 302
 
 
+def csrf_from_profile(client: TestClient) -> str:
+    response = client.get("/profile")
+    result = re.search(r'name="csrf_token" value="([^"]+)"', response.text)
+    assert result is not None
+    return result.group(1)
+
+
 def test_home_page_shows_login(monkeypatch, config_file, oidc_client):
     with create_test_client(monkeypatch, config_file, oidc_client) as client:
         response = client.get("/")
@@ -119,6 +127,64 @@ def test_callback_stores_user_in_session(monkeypatch, config_file, oidc_client):
     assert response.headers["location"] == "/profile"
     assert profile_response.status_code == 200
     assert "test@example.com" in profile_response.text
+
+
+def test_token_experiment_refreshes_and_calls_graph(monkeypatch, config_file, oidc_client):
+    oidc_client.load_server_metadata.return_value = {"token_endpoint": "https://idp.example/token"}
+    oidc_client.authorize_access_token.return_value = {
+        "userinfo": {"email": "test@example.com"},
+        "access_token": "old-access",
+        "refresh_token": "old-refresh",
+        "expires_in": 3600,
+        "scope": "User.Read offline_access",
+    }
+    refresh = AsyncMock(return_value={"access_token": "new-access", "refresh_token": "new-refresh", "expires_in": 3600})
+    graph = AsyncMock(return_value=200)
+    monkeypatch.setattr("oidc_client_demo.app.refresh_access_token", refresh)
+    monkeypatch.setattr("oidc_client_demo.app.call_graph_me", graph)
+
+    with create_test_client(monkeypatch, config_file, oidc_client) as client:
+        client.get("/auth/callback")
+        csrf = csrf_from_profile(client)
+        assert client.post("/refresh", data={"csrf_token": csrf}, follow_redirects=False).status_code == 303
+        page = client.get("/profile")
+        assert "Refresh succeeded" in page.text
+        assert "Replacement refresh token received: yes" in page.text
+        assert "Refresh token changed: yes" in page.text
+        assert "old-refresh" not in page.text
+        assert "new-refresh" not in page.text
+        assert "old-refresh" not in client.cookies.get("session", "")
+        assert "new-refresh" not in client.cookies.get("session", "")
+        assert client.post("/graph-me", data={"csrf_token": csrf}, follow_redirects=False).status_code == 303
+        assert "Graph /me returned HTTP 200" in client.get("/profile").text
+        client.get("/logout", follow_redirects=False)
+        assert not client.app.state.token_store
+
+    refresh.assert_awaited_once_with("https://idp.example/token", "test-client", None, "old-refresh")
+    graph.assert_awaited_once_with("new-access")
+
+
+def test_refresh_failure_and_missing_token(monkeypatch, config_file, oidc_client):
+    oidc_client.load_server_metadata.return_value = {"token_endpoint": "https://idp.example/token"}
+    oidc_client.authorize_access_token.return_value = {
+        "userinfo": {"email": "test@example.com"},
+        "access_token": "old-access",
+        "refresh_token": "old-refresh",
+    }
+    refresh = AsyncMock(return_value={"error": "invalid_grant"})
+    monkeypatch.setattr("oidc_client_demo.app.refresh_access_token", refresh)
+    with create_test_client(monkeypatch, config_file, oidc_client) as client:
+        client.get("/auth/callback")
+        csrf = csrf_from_profile(client)
+        assert client.post("/refresh", data={"csrf_token": "wrong"}).status_code == 403
+        client.post("/refresh", data={"csrf_token": csrf})
+        assert "Refresh failed: invalid_grant" in client.get("/profile").text
+        assert next(iter(client.app.state.token_store.values())).refresh_token == "old-refresh"
+
+        next(iter(client.app.state.token_store.values())).refresh_token = None
+        client.post("/refresh", data={"csrf_token": csrf})
+        assert "No refresh token was issued" in client.get("/profile").text
+    refresh.assert_awaited_once()
 
 
 def test_profile_page_shows_only_email(monkeypatch, config_file, oidc_client):

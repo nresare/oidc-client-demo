@@ -27,6 +27,7 @@ def register_oidc_client(app: Starlette, oidc_config: OidcConfig) -> Any:
     return oauth.register(
         name="oidc",
         client_id=oidc_config.client_id,
+        client_secret=oidc_config.client_secret,
         server_metadata_url=oidc_config.server_metadata_url,
         client_kwargs={"scope": " ".join(oidc_config.scopes)},
         code_challenge_method="S256",

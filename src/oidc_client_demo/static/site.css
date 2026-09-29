@@ -116,6 +116,15 @@ a {
   border-color: var(--accent);
 }
 
+button.button {
+  font: inherit;
+  cursor: pointer;
+}
+
+form {
+  margin: 0;
+}
+
 .meta {
   margin-top: 2rem;
   color: var(--muted);
