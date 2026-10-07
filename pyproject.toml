@@ -13,6 +13,8 @@ dependencies = [
     "requests",
     "starlette",
     "httpx2>=2.12.0",
+    "opentelemetry-sdk>=1.45.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.45.1",
 ]
 
 [build-system]

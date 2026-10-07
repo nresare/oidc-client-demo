@@ -23,6 +23,7 @@ from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
+from starlette.types import ASGIApp
 
 from oidc_client_demo.auth import (
     OidcInitializationError,
@@ -33,6 +34,7 @@ from oidc_client_demo.auth import (
 )
 from oidc_client_demo.config import load_config
 from oidc_client_demo.tokens import TokenRecord, call_graph_me, refresh_access_token, token_expiry
+from oidc_client_demo.tracing import RequestTracingMiddleware, create_tracer_provider
 
 logger = logging.getLogger(__name__)
 
@@ -201,8 +203,20 @@ def create_app(config_path: str = "config.toml") -> Starlette:
 
     @asynccontextmanager
     async def lifespan(app: Starlette):
-        await configure_oidc(app)
-        yield
+        provider = create_tracer_provider(config.otel) if config.otel else None
+        app.state.tracer_provider = provider
+        original_stack = app.middleware_stack
+        if provider:
+            app.middleware_stack = RequestTracingMiddleware(
+                cast(ASGIApp, original_stack), tracer=provider.get_tracer("oidc_client_demo")
+            )
+        try:
+            await configure_oidc(app)
+            yield
+        finally:
+            if provider:
+                app.middleware_stack = original_stack
+                await asyncio.to_thread(provider.shutdown)
 
     middleware = [
         Middleware(

@@ -280,3 +280,76 @@ def test_local_redirects_preserve_public_origin(monkeypatch, tmp_path, oidc_clie
         response = client.get(route, follow_redirects=False)
     assert response.status_code == 302
     assert response.headers["location"] == destination
+
+
+def test_request_tracing_exports_one_span_per_request(monkeypatch, config_file, oidc_client):
+    from opentelemetry.sdk.trace.export import SpanExportResult
+    from opentelemetry.trace import SpanKind, StatusCode
+
+    exporter = Mock()
+    exporter.export.return_value = SpanExportResult.SUCCESS
+    monkeypatch.setattr("oidc_client_demo.tracing.OTLPSpanExporter", lambda **kwargs: exporter)
+    with config_file.open("a") as f:
+        f.write('\n[otel]\nendpoint = "http://tempo:4318/v1/traces"\n')
+    with create_test_client(monkeypatch, config_file, oidc_client) as client:
+        assert client.get("/healthz?code=secret").status_code == 200
+        assert client.get("/missing").status_code == 404
+        assert client.get("/static/site.css").status_code == 200
+        oidc_client.authorize_access_token.side_effect = RuntimeError("secret-token")
+        with pytest.raises(RuntimeError):
+            client.get("/auth/callback?code=secret-token")
+    spans = [span for call in exporter.export.call_args_list for span in call.args[0]]
+    assert len(spans) == 4
+    assert len({span.context.trace_id for span in spans}) == 4
+    assert all(span.kind == SpanKind.SERVER for span in spans)
+    assert all(span.resource.attributes["service.name"] == "oidc-client-demo" for span in spans)
+    assert [span.attributes["http.response.status_code"] for span in spans] == [200, 404, 200, 500]
+    assert spans[-1].status.status_code == StatusCode.ERROR
+    assert "secret" not in str([(span.attributes, span.events, span.status.description) for span in spans])
+    exporter.shutdown.assert_called_once()
+
+
+def test_request_tracing_disabled(monkeypatch, config_file, oidc_client):
+    factory = Mock()
+    monkeypatch.setattr("oidc_client_demo.app.create_tracer_provider", factory)
+    with create_test_client(monkeypatch, config_file, oidc_client) as client:
+        assert client.get("/healthz").status_code == 200
+    factory.assert_not_called()
+
+
+def test_request_tracing_submits_otlp_http(monkeypatch, config_file, oidc_client):
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from threading import Thread
+
+    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+
+    received = []
+
+    class Receiver(BaseHTTPRequestHandler):
+        def do_POST(self):
+            received.append((self.path, self.rfile.read(int(self.headers["Content-Length"]))))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, format, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Receiver)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with config_file.open("a") as f:
+            f.write(f'\n[otel]\nendpoint = "http://127.0.0.1:{server.server_port}/v1/traces"\n')
+        with create_test_client(monkeypatch, config_file, oidc_client) as client:
+            assert client.get("/healthz").status_code == 200
+        assert len(received) == 1
+        path, body = received[0]
+        assert path == "/v1/traces"
+        request = ExportTraceServiceRequest.FromString(body)
+        spans = [span for resource in request.resource_spans for scope in resource.scope_spans for span in scope.spans]
+        assert len(spans) == 1
+        assert spans[0].name == "GET"
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
