@@ -70,3 +70,27 @@ to preserve sessions; replacing it invalidates existing sessions.
 The deployment manifest requests `random-secret = "session-key"`, which mounts the
 generated key at `/random-secrets/session-key`. The deployment configuration uses
 that path.
+
+## Request tracing with Tempo
+
+To enable tracing, add this section to your configuration:
+
+```toml
+[otel]
+endpoint = "http://localhost:4318/v1/traces"
+service_name = "oidc-client-demo"
+```
+
+Use the full OTLP/HTTP traces URL, including `/v1/traces`, for your Tempo or
+collector receiver (not the gRPC port 4317). The service name is optional and
+defaults to `oidc-client-demo`. Omit `[otel]` to disable tracing.
+
+Every HTTP request, including static files and health checks, creates one server
+span with its method, path, status code and duration. Spans are exported in
+background batches and flushed on graceful shutdown. Export failures are logged
+without failing requests. Query strings, headers, bodies, user information and
+exception messages are not recorded. Incoming trace headers are not used; each
+request starts a new trace and is always sampled.
+
+Start the app, request `/healthz` or sign in, then search in Tempo for service
+`oidc-client-demo`. Allow a few seconds for the export batch to arrive.

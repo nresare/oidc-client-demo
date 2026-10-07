@@ -95,3 +95,24 @@ def test_load_config_rejects_unknown_app_parameter(tmp_path):
     with pytest.raises(ValueError) as exc_info:
         load_config(config_path)
     assert str(exc_info.value) == "Unknown configuration parameter(s): app.secreet_key_path"
+
+
+def test_load_config_otel(tmp_path):
+    (tmp_path / "session-key").write_text("test-secret")
+    path = write_config(tmp_path)
+    with open(path, "a") as f:
+        f.write('\n[otel]\nendpoint = "http://tempo:4318/v1/traces"\n')
+    config = load_config(path)
+    assert config.otel is not None
+    assert config.otel.endpoint == "http://tempo:4318/v1/traces"
+    assert config.otel.service_name == "oidc-client-demo"
+
+
+@pytest.mark.parametrize("endpoint", ['""', "123", '"grpc://tempo:4317"'])
+def test_load_config_invalid_otel(tmp_path, endpoint):
+    (tmp_path / "session-key").write_text("test-secret")
+    path = write_config(tmp_path)
+    with open(path, "a") as f:
+        f.write(f"\n[otel]\nendpoint = {endpoint}\n")
+    with pytest.raises(ValueError, match="otel.endpoint"):
+        load_config(path)

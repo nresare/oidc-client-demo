@@ -5,12 +5,14 @@ import logging
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
 
 CONFIG_PARAMETERS = {
     # Keep deprecated names here so their existing, more specific errors still apply.
     "app": {"secret_key", "secret_key_path", "base_url"},
+    "otel": {"endpoint", "service_name"},
     "oidc": {"issuer", "client_id", "client_secret", "client_secret_path", "scopes"},
 }
 
@@ -34,9 +36,16 @@ class OidcConfig:
 
 
 @dataclass
+class OtelConfig:
+    endpoint: str
+    service_name: str = "oidc-client-demo"
+
+
+@dataclass
 class Config:
     app: AppConfig
     oidc: OidcConfig
+    otel: OtelConfig | None = None
 
 
 def load_config(config_path: str) -> Config:
@@ -91,7 +100,22 @@ def load_config(config_path: str) -> Config:
         if not client_secret:
             raise ValueError(f"Client secret file is empty: {client_secret_file}")
 
+    otel = None
+    if "otel" in data:
+        otel_data = data["otel"]
+        endpoint = otel_data.get("endpoint") if isinstance(otel_data, dict) else None
+        if not isinstance(endpoint, str) or not endpoint.strip():
+            raise ValueError("Missing or invalid otel.endpoint")
+        url = urlsplit(endpoint)
+        if url.scheme not in {"http", "https"} or not url.hostname or url.query or url.fragment:
+            raise ValueError("otel.endpoint must be an HTTP(S) traces URL without query or fragment")
+        service_name = otel_data.get("service_name", "oidc-client-demo")
+        if not isinstance(service_name, str) or not service_name.strip():
+            raise ValueError("Invalid otel.service_name")
+        otel = OtelConfig(endpoint=endpoint, service_name=service_name)
+
     return Config(
+        otel=otel,
         app=AppConfig(
             secret_key=secret_key,
             base_url=app_data.get("base_url", "http://localhost:8080"),
