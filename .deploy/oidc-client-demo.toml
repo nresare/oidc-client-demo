@@ -10,3 +10,7 @@ client_id = "82121173-5d45-4932-9067-8872b8735206"
 scopes = ["openid", "profile", "email", "offline_access"]
 #, "https://graph.microsoft.com/User.Read"]
 client_secret_path = "/secret/client_id"
+
+[otel]
+endpoint = "http://tempo.tempo.svc:4318/v1/traces"
+service_name = "oidc-client-demo"
