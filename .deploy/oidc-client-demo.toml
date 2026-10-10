@@ -3,6 +3,9 @@
 [app]
 secret_key_path = "/random-secrets/session-key"
 base_url = "https://demo.resare.com"
+# PEM files from the website-generated TLS Secret; enables the HTTPS listener on 8443.
+tls_cert_path = "/tls/tls.crt"
+tls_key_path = "/tls/tls.key"
 
 [oidc]
 issuer = "https://login.microsoftonline.com/1b5955bf-2426-4ced-8412-9fe81bb8bca4/v2.0"

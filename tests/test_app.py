@@ -9,6 +9,7 @@ from starlette.testclient import TestClient
 
 from oidc_client_demo.app import create_app, create_hypercorn_config, run_server
 from oidc_client_demo.auth import OidcInitializationError
+from oidc_client_demo.config import AppConfig
 
 
 @pytest.fixture
@@ -253,8 +254,11 @@ def test_logout_uses_configured_base_url_for_post_logout_redirect(monkeypatch, t
 
 
 def test_create_hypercorn_config_sets_runtime_defaults():
-    config = create_hypercorn_config()
+    config = create_hypercorn_config(AppConfig(secret_key="test"))
 
+    assert config.certfile is None
+    assert config.keyfile is None
+    assert not config.ssl_enabled
     assert config.bind == ["0.0.0.0:8080"]
     assert config.accesslog == "-"
     assert config.errorlog == "-"
@@ -267,7 +271,7 @@ async def test_run_server_wraps_oidc_startup_errors(monkeypatch, config_file, oi
     app = create_app(str(config_file))
 
     with pytest.raises(OidcInitializationError, match="Unable to load OIDC provider metadata"):
-        await run_server(app, create_hypercorn_config())
+        await run_server(app, create_hypercorn_config(AppConfig(secret_key="test")))
 
 
 @pytest.mark.parametrize(
@@ -353,3 +357,22 @@ def test_request_tracing_submits_otlp_http(monkeypatch, config_file, oidc_client
         server.shutdown()
         thread.join()
         server.server_close()
+
+
+@pytest.mark.anyio
+async def test_run_server_uses_tls_settings(monkeypatch, config_file, oidc_client):
+    monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, oidc_config: oidc_client)
+    app = create_app(str(config_file))
+    app.state.settings.app.tls_cert_path = "/cert.pem"
+    app.state.settings.app.tls_key_path = "/key.pem"
+    serve = AsyncMock()
+    monkeypatch.setattr("oidc_client_demo.app.serve", serve)
+
+    await run_server(app)
+
+    config = serve.call_args.args[1]
+    assert config.bind == ["0.0.0.0:8443"]
+    assert config.certfile == "/cert.pem"
+    assert config.keyfile == "/key.pem"
+    assert config.ssl_enabled
+    assert config.alpn_protocols == ["h2", "http/1.1"]

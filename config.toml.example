@@ -3,6 +3,9 @@
 [app]
 secret_key_path = "session-key"
 base_url = "http://localhost:8080"
+# Optional HTTPS listener with HTTP/2 via ALPN; set both PEM file paths.
+# tls_cert_path = "tls/cert.pem"
+# tls_key_path = "tls/key.pem"
 
 [oidc]
 issuer = "https://id.noa.re"
