@@ -32,7 +32,7 @@ from oidc_client_demo.auth import (
     get_oidc_metadata,
     login_required,
 )
-from oidc_client_demo.config import load_config
+from oidc_client_demo.config import AppConfig, load_config
 from oidc_client_demo.tokens import TokenRecord, call_graph_me, refresh_access_token, token_expiry
 from oidc_client_demo.tracing import RequestTracingMiddleware, create_tracer_provider
 
@@ -190,9 +190,13 @@ async def logout(request: Request) -> Response:
     return RedirectResponse(url="/", status_code=302)
 
 
-def create_hypercorn_config() -> HypercornConfig:
+def create_hypercorn_config(app_config: AppConfig) -> HypercornConfig:
     config = HypercornConfig()
-    config.bind = ["0.0.0.0:8080"]
+    port = 8443 if app_config.tls_cert_path and app_config.tls_key_path else 8080
+    config.bind = [f"0.0.0.0:{port}"]
+    config.certfile = app_config.tls_cert_path
+    config.keyfile = app_config.tls_key_path
+    config.alpn_protocols = ["h2", "http/1.1"]
     config.accesslog = "-"
     config.errorlog = "-"
     return config
@@ -250,7 +254,7 @@ def create_app(config_path: str = "config.toml") -> Starlette:
 
 async def run_server(app: Starlette, config: HypercornConfig | None = None) -> None:
     await configure_oidc(app)
-    await serve(cast(Framework, app), config or create_hypercorn_config())
+    await serve(cast(Framework, app), config or create_hypercorn_config(app.state.settings.app))
 
 
 def setup_logging() -> None:

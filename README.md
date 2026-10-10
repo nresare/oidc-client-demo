@@ -33,6 +33,33 @@ uv run oidc-client-demo
 
 The app listens on port `8080`.
 
+## HTTPS and HTTP/2
+
+To enable TLS on the listener, set both PEM file paths in `[app]`:
+
+```toml
+[app]
+secret_key_path = "session-key"
+base_url = "https://demo.example.com"
+tls_cert_path = "tls/cert.pem"
+tls_key_path = "tls/key.pem"
+```
+
+Relative paths are resolved from the configuration file's directory. Supply a PEM
+certificate (including any intermediate certificates) and its matching unencrypted
+PEM private key. Missing, unreadable, invalid, or mismatched files prevent server
+startup. Restart the app after replacing the files to load the new certificate.
+
+With both paths configured, port `8443` serves HTTPS and advertises `h2` and
+`http/1.1` through ALPN. Configure the terminating proxy to connect to the workload
+using TLS with HTTP/2, trust the certificate's issuer, and use a server name that
+matches the certificate. Health checks must also use HTTPS. Omit both paths to
+keep the plain HTTP listener.
+
+`app.base_url` remains the public URL used for OIDC redirects and session cookie
+settings; it can differ from the proxy's upstream address. For direct local HTTPS,
+set it to `https://localhost:8443` and register the corresponding callback URL.
+
 ## Microsoft Entra refresh-token experiment
 
 1. Register a **Web** application in Entra with redirect URI
@@ -69,7 +96,14 @@ to preserve sessions; replacing it invalidates existing sessions.
 
 The deployment manifest requests `random-secret = "session-key"`, which mounts the
 generated key at `/random-secrets/session-key`. The deployment configuration uses
-that path.
+that path. It also sets `tls = true` in the website block, which creates a
+certificate from the `cluster-local` ClusterIssuer and mounts its Secret at `/tls`.
+The app reads `/tls/tls.crt` and `/tls/tls.key`. The generated BackendTLSPolicy
+validates the service certificate against the `cluster-local-ca` ConfigMap,
+distributed by trust-manager to namespaces labeled `trust: cluster-local`.
+The website block adds that namespace label and switches the service and health
+check to HTTPS. This requires the website plugin update in
+[system PR #62](https://github.com/nresare/system/pull/62) before deployment.
 
 ## Request tracing with Tempo
 

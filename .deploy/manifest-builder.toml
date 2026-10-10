@@ -1,6 +1,9 @@
 [[website]]
 name = "demo.resare.com"
 replicas = 1
+# Generate a cluster-local certificate, /tls mount, and CA-validating backend policy.
+# The HTTPS Service exposes port 443 and targets the app on port 8443.
+tls = true
 args = ["-c", "/config/config.toml"]
 config = { "/config/config.toml" = "oidc-client-demo.toml" }
 random-secret = "session-key"

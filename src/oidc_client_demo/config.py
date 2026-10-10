@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 CONFIG_PARAMETERS = {
     # Keep deprecated names here so their existing, more specific errors still apply.
-    "app": {"secret_key", "secret_key_path", "base_url"},
+    "app": {"secret_key", "secret_key_path", "base_url", "tls_cert_path", "tls_key_path"},
     "otel": {"endpoint", "service_name"},
     "oidc": {"issuer", "client_id", "client_secret", "client_secret_path", "scopes"},
 }
@@ -21,6 +21,8 @@ CONFIG_PARAMETERS = {
 class AppConfig:
     secret_key: str
     base_url: str = "http://localhost:8080"
+    tls_cert_path: str | None = None
+    tls_key_path: str | None = None
 
 
 @dataclass
@@ -86,6 +88,17 @@ def load_config(config_path: str) -> Config:
     if not secret_key:
         raise ValueError(f"Secret key file is empty: {secret_path}")
 
+    tls_paths = {}
+    if "tls_cert_path" in app_data or "tls_key_path" in app_data:
+        for name in ("tls_cert_path", "tls_key_path"):
+            value = app_data.get(name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"Missing or invalid app.{name}; TLS requires both tls_cert_path and tls_key_path")
+            tls_path = Path(value)
+            if not tls_path.is_absolute():
+                tls_path = path.parent / tls_path
+            tls_paths[name] = str(tls_path)
+
     client_secret = None
     if "client_secret" in oidc_data:
         raise ValueError("oidc.client_secret is not supported; use oidc.client_secret_path")
@@ -118,6 +131,7 @@ def load_config(config_path: str) -> Config:
         otel=otel,
         app=AppConfig(
             secret_key=secret_key,
+            **tls_paths,
             base_url=app_data.get("base_url", "http://localhost:8080"),
         ),
         oidc=OidcConfig(

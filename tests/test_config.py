@@ -116,3 +116,32 @@ def test_load_config_invalid_otel(tmp_path, endpoint):
         f.write(f"\n[otel]\nendpoint = {endpoint}\n")
     with pytest.raises(ValueError, match="otel.endpoint"):
         load_config(path)
+
+
+@pytest.mark.parametrize("absolute", [False, True])
+def test_load_config_tls_paths(tmp_path, absolute):
+    (tmp_path / "session-key").write_text("test-secret")
+    cert = str(tmp_path / "cert.pem") if absolute else "cert.pem"
+    key = str(tmp_path / "key.pem") if absolute else "key.pem"
+    config = load_config(
+        write_config(tmp_path, f'secret_key_path = "session-key"\ntls_cert_path = "{cert}"\ntls_key_path = "{key}"')
+    )
+    assert config.app.tls_cert_path == str(tmp_path / "cert.pem")
+    assert config.app.tls_key_path == str(tmp_path / "key.pem")
+
+
+@pytest.mark.parametrize(
+    "tls_config",
+    [
+        'tls_cert_path = "cert.pem"',
+        'tls_key_path = "key.pem"',
+        'tls_cert_path = ""\ntls_key_path = "key.pem"',
+        'tls_cert_path = "cert.pem"\ntls_key_path = "  "',
+        'tls_cert_path = 123\ntls_key_path = "key.pem"',
+        'tls_cert_path = "cert.pem"\ntls_key_path = false',
+    ],
+)
+def test_load_config_requires_valid_tls_pair(tmp_path, tls_config):
+    (tmp_path / "session-key").write_text("test-secret")
+    with pytest.raises(ValueError, match="TLS requires both"):
+        load_config(write_config(tmp_path, f'secret_key_path = "session-key"\n{tls_config}'))
