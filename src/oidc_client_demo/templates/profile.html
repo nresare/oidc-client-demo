@@ -26,7 +26,7 @@
           <dl>
             <dt>Access token</dt><dd>{{ "Present" if token.access_token else "Missing" }}</dd>
             <dt>Access token expires</dt><dd>{{ token.expires_at.isoformat() if token.expires_at else "Not reported" }}</dd>
-            <dt>Refresh token</dt><dd>{{ "Present" if token.refresh_token else "Missing" }}</dd>
+            <dt>Refresh token</dt><dd>{{ "Present" if has_refresh_token else "Missing" }}</dd>
             <dt>Granted scopes</dt><dd>{{ token.scope or "Not reported" }}</dd>
           </dl>
           {% if token.last_refresh %}<p class="meta">{{ token.last_refresh }}</p>{% endif %}

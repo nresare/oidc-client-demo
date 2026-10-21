@@ -8,7 +8,7 @@ dependencies = [
     "authlib",
     "click",
     "hypercorn",
-    "itsdangerous",
+    "cryptography",
     "jinja2",
     "requests",
     "starlette",

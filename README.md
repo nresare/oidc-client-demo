@@ -73,15 +73,29 @@ for your client at the identity provider if required. If your provider requires 
 client secret, save it in a local `client-secret` file (mode `0600`) beside
 `config.toml` and set `oidc.client_secret_path = "client-secret"`.
 
-The app never displays token values. It keeps them in process memory, keyed by
-an opaque ID in the signed session cookie, and deletes them on logout. Restarting
-the app loses the token records, so sign in again afterward. Run a single worker;
-a production deployment would need a shared, protected server-side token store.
-A refresh failure displays the protocol error code and leaves the option to sign
-in again. Signing out of the site does not revoke refresh tokens at the identity
-provider.
+The app never displays token values. Session data, including the refresh token,
+is stored in an authenticated, encrypted browser cookie using a key derived from
+`app.secret_key_path`. The cookie is HttpOnly, uses SameSite=Lax, and is marked
+Secure when `app.base_url` uses HTTPS. Sessions expire after 14 days without a
+session update. Refresh-token rotation updates the cookie; if no replacement is
+issued, the existing refresh token is retained.
 
-Set `app.secret_key_path` to a UTF-8 file containing the session signing key.
+Access tokens and their metadata are cached in process memory. If the cache is
+lost after a restart or a request reaches another worker, opening the profile
+page uses the refresh token to obtain a new access token. Workers must share the
+same session key. Without a refresh token, sign in again to restore the access
+token. Concurrent refreshes across workers or browser tabs may require signing
+in again with providers that reject reuse of rotated refresh tokens.
+
+Refresh tokens can vary in size by provider. The complete encrypted session
+cookie must fit within 4096 bytes, including its attributes; oversized sessions
+return an error and clear the cookie. Access and ID tokens are never stored in
+the session cookie. Signing out clears the cookie and this worker's cached access
+token, but does not revoke tokens at the identity provider or invalidate a copied
+cookie. A refresh failure displays the protocol error code and leaves the option
+to sign in again.
+
+Set `app.secret_key_path` to a UTF-8 file containing the session encryption secret.
 Relative paths are resolved from the configuration file's directory. Leading and
 trailing whitespace is stripped; missing or empty files prevent startup. Inline
 `app.secret_key` values are no longer supported. Keep the key stable across restarts
