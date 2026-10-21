@@ -71,8 +71,7 @@ To request refresh tokens, add `"offline_access"` to `oidc.scopes`, for example
 `["openid", "profile", "email", "offline_access"]`, and enable refresh-token issuance
 for your client at the identity provider if required. If your provider requires a
 client secret, save it in a local `client-secret` file (mode `0600`) beside
-`config.toml` and set `oidc.client_secret_path = "client-secret"`. Keep the secret
-out of Git.
+`config.toml` and set `oidc.client_secret_path = "client-secret"`.
 
 The app never displays token values. It keeps them in process memory, keyed by
 an opaque ID in the signed session cookie, and deletes them on logout. Restarting
