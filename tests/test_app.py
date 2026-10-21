@@ -92,6 +92,7 @@ def test_token_exchange(monkeypatch, config_file, invalid_response, client_secre
     oidc = register_oidc_client(
         app, OidcConfig(issuer="https://idp.example", client_id="test-client", client_secret=client_secret)
     )
+    assert oidc.client_kwargs["http2"] is True
     oidc.server_metadata.update(
         _loaded_at=1,
         authorization_endpoint="https://idp.example/authorize",

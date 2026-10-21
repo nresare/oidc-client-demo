@@ -16,8 +16,9 @@ async def test_refresh_request_uses_refresh_grant_and_client_secret(monkeypatch)
             return {"access_token": "new-access", "refresh_token": "new-refresh"}
 
     class FakeClient:
-        def __init__(self, timeout):
+        def __init__(self, timeout, http2):
             assert timeout == 10
+            assert http2 is True
 
         async def __aenter__(self):
             return self
@@ -50,8 +51,9 @@ async def test_graph_request_uses_access_token(monkeypatch):
     get.return_value.status_code = 200
 
     class FakeClient:
-        def __init__(self, timeout):
+        def __init__(self, timeout, http2):
             assert timeout == 10
+            assert http2 is True
 
         async def __aenter__(self):
             return self
@@ -76,7 +78,7 @@ async def test_refresh_error_shows_code_without_description(monkeypatch):
             return {"error": "invalid_grant", "error_codes": [700082], "error_description": "private details"}
 
     class FakeClient:
-        def __init__(self, timeout):
+        def __init__(self, timeout, http2):
             pass
 
         async def __aenter__(self):

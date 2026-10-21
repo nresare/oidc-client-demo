@@ -45,7 +45,7 @@ async def refresh_access_token(
     data = {"grant_type": "refresh_token", "client_id": client_id, "refresh_token": refresh_token}
     if client_secret:
         data["client_secret"] = client_secret
-    async with httpx2.AsyncClient(timeout=10) as client:
+    async with httpx2.AsyncClient(timeout=10, http2=True) as client:
         response = await client.post(token_endpoint, data=data)
     try:
         result = response.json()
@@ -64,6 +64,6 @@ async def refresh_access_token(
 
 
 async def call_graph_me(access_token: str) -> int:
-    async with httpx2.AsyncClient(timeout=10) as client:
+    async with httpx2.AsyncClient(timeout=10, http2=True) as client:
         response = await client.get(GRAPH_ME_URL, headers={"Authorization": f"Bearer {access_token}"})
     return response.status_code
