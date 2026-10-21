@@ -21,3 +21,5 @@ client_secret_path = "/secret/client_id"
 [otel]
 endpoint = "http://tempo.tempo.svc:4318/v1/traces"
 service_name = "oidc-client-demo"
+
+excluded_paths = ["/healthz"]

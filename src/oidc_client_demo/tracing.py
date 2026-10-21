@@ -19,12 +19,13 @@ def create_tracer_provider(config: OtelConfig) -> TracerProvider:
 
 
 class RequestTracingMiddleware:
-    def __init__(self, app: ASGIApp, tracer: Tracer):
+    def __init__(self, app: ASGIApp, tracer: Tracer, excluded_paths: list[str]):
         self.app = app
         self.tracer = tracer
+        self.excluded_paths = frozenset(excluded_paths)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
+        if scope["type"] != "http" or scope["path"] in self.excluded_paths:
             await self.app(scope, receive, send)
             return
 
@@ -53,3 +54,9 @@ class RequestTracingMiddleware:
                 span.set_attribute("error.type", type(exc).__name__)
                 span.set_status(StatusCode.ERROR)
                 raise
+            finally:
+                # Routing has completed; use its template rather than a concrete URL.
+                route = getattr(scope.get("route"), "path_format", None)
+                if route:
+                    span.update_name(f"{method} {route}")
+                    span.set_attribute("http.route", route)

@@ -145,3 +145,13 @@ def test_load_config_requires_valid_tls_pair(tmp_path, tls_config):
     (tmp_path / "session-key").write_text("test-secret")
     with pytest.raises(ValueError, match="TLS requires both"):
         load_config(write_config(tmp_path, f'secret_key_path = "session-key"\n{tls_config}'))
+
+
+@pytest.mark.parametrize("value", ['"/healthz"', "[123]", '["healthz"]', '["/healthz?x=1"]', '["/healthz#x"]'])
+def test_load_config_rejects_invalid_excluded_paths(tmp_path, value):
+    (tmp_path / "session-key").write_text("test-secret")
+    path = write_config(tmp_path)
+    with open(path, "a") as f:
+        f.write(f'\n[otel]\nendpoint = "http://tempo:4318/v1/traces"\nexcluded_paths = {value}\n')
+    with pytest.raises(ValueError, match="otel.excluded_paths"):
+        load_config(path)
