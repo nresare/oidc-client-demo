@@ -49,7 +49,7 @@ def register_oidc_client(app: Starlette, oidc_config: OidcConfig) -> Any:
         client_id=oidc_config.client_id,
         client_secret=oidc_config.client_secret,
         server_metadata_url=oidc_config.server_metadata_url,
-        client_kwargs={"scope": " ".join(oidc_config.scopes)},
+        client_kwargs={"scope": " ".join(oidc_config.scopes), "http2": True},
         code_challenge_method="S256",
         compliance_fix=configure_token_response_validation,
     )
