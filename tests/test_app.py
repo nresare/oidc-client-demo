@@ -308,6 +308,9 @@ def test_request_tracing_exports_one_span_per_request(monkeypatch, config_file, 
     assert all(span.kind == SpanKind.SERVER for span in spans)
     assert all(span.resource.attributes["service.name"] == "oidc-client-demo" for span in spans)
     assert [span.attributes["http.response.status_code"] for span in spans] == [200, 404, 200, 500]
+    assert [span.name for span in spans] == ["GET /healthz", "GET", "GET /static/{path}", "GET /auth/callback"]
+    assert "http.route" not in spans[1].attributes
+    assert spans[-1].attributes["http.route"] == "/auth/callback"
     assert spans[-1].status.status_code == StatusCode.ERROR
     assert "secret" not in str([(span.attributes, span.events, span.status.description) for span in spans])
     exporter.shutdown.assert_called_once()
@@ -352,7 +355,7 @@ def test_request_tracing_submits_otlp_http(monkeypatch, config_file, oidc_client
         request = ExportTraceServiceRequest.FromString(body)
         spans = [span for resource in request.resource_spans for scope in resource.scope_spans for span in scope.spans]
         assert len(spans) == 1
-        assert spans[0].name == "GET"
+        assert spans[0].name == "GET /healthz"
     finally:
         server.shutdown()
         thread.join()
@@ -376,3 +379,29 @@ async def test_run_server_uses_tls_settings(monkeypatch, config_file, oidc_clien
     assert config.keyfile == "/key.pem"
     assert config.ssl_enabled
     assert config.alpn_protocols == ["h2", "http/1.1"]
+
+
+def test_tracing_excludes_exact_paths_and_names_parameterized_routes(monkeypatch, config_file, oidc_client):
+    from opentelemetry.sdk.trace.export import SpanExportResult
+    from starlette.routing import Route
+
+    exporter = Mock()
+    exporter.export.return_value = SpanExportResult.SUCCESS
+    monkeypatch.setattr("oidc_client_demo.tracing.OTLPSpanExporter", lambda **kwargs: exporter)
+    with config_file.open("a") as f:
+        f.write('\n[otel]\nendpoint = "http://tempo:4318/v1/traces"\nexcluded_paths = ["/healthz"]\n')
+
+    async def user(request):
+        return Response(status_code=204)
+
+    with create_test_client(monkeypatch, config_file, oidc_client) as client:
+        client.app.routes.append(Route("/users/{user_id}", user))
+        assert client.get("/healthz?probe=1").status_code == 200
+        assert client.head("/healthz").status_code == 200
+        assert client.get("/healthz-extra").status_code == 404
+        assert client.get("/users/123").status_code == 204
+        assert client.get("/users/456").status_code == 204
+    spans = [span for call in exporter.export.call_args_list for span in call.args[0]]
+    assert len(spans) == 3
+    assert [span.name for span in spans] == ["GET", "GET /users/{user_id}", "GET /users/{user_id}"]
+    assert all(span.attributes["http.route"] == "/users/{user_id}" for span in spans[1:])

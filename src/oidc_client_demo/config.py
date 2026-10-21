@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 CONFIG_PARAMETERS = {
     # Keep deprecated names here so their existing, more specific errors still apply.
     "app": {"secret_key", "secret_key_path", "base_url", "tls_cert_path", "tls_key_path"},
-    "otel": {"endpoint", "service_name"},
+    "otel": {"endpoint", "service_name", "excluded_paths"},
     "oidc": {"issuer", "client_id", "client_secret", "client_secret_path", "scopes"},
 }
 
@@ -41,6 +41,7 @@ class OidcConfig:
 class OtelConfig:
     endpoint: str
     service_name: str = "oidc-client-demo"
+    excluded_paths: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -125,7 +126,15 @@ def load_config(config_path: str) -> Config:
         service_name = otel_data.get("service_name", "oidc-client-demo")
         if not isinstance(service_name, str) or not service_name.strip():
             raise ValueError("Invalid otel.service_name")
-        otel = OtelConfig(endpoint=endpoint, service_name=service_name)
+        excluded_paths = otel_data.get("excluded_paths", [])
+        if not isinstance(excluded_paths, list) or any(
+            not isinstance(value, str) or not value.startswith("/") or "?" in value or "#" in value
+            for value in excluded_paths
+        ):
+            raise ValueError(
+                "Invalid otel.excluded_paths; expected a list of absolute URL paths without query or fragment"
+            )
+        otel = OtelConfig(endpoint=endpoint, service_name=service_name, excluded_paths=excluded_paths)
 
     return Config(
         otel=otel,

@@ -210,9 +210,11 @@ def create_app(config_path: str = "config.toml") -> Starlette:
         provider = create_tracer_provider(config.otel) if config.otel else None
         app.state.tracer_provider = provider
         original_stack = app.middleware_stack
-        if provider:
+        if provider and config.otel:
             app.middleware_stack = RequestTracingMiddleware(
-                cast(ASGIApp, original_stack), tracer=provider.get_tracer("oidc_client_demo")
+                cast(ASGIApp, original_stack),
+                tracer=provider.get_tracer("oidc_client_demo"),
+                excluded_paths=config.otel.excluded_paths,
             )
         try:
             await configure_oidc(app)

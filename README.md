@@ -113,18 +113,24 @@ To enable tracing, add this section to your configuration:
 [otel]
 endpoint = "http://localhost:4318/v1/traces"
 service_name = "oidc-client-demo"
+excluded_paths = ["/healthz"]
 ```
 
 Use the full OTLP/HTTP traces URL, including `/v1/traces`, for your Tempo or
 collector receiver (not the gRPC port 4317). The service name is optional and
 defaults to `oidc-client-demo`. Omit `[otel]` to disable tracing.
 
-Every HTTP request, including static files and health checks, creates one server
-span with its method, path, status code and duration. Spans are exported in
+`excluded_paths` skips tracing for exact URL paths, regardless of method or query
+string. It defaults to an empty list. The deployment excludes `/healthz`.
+
+Each remaining HTTP request creates one server span with its method, path, status
+code and duration. Span names use the method and matched route template, such as
+`GET /profile` or `GET /users/{id}`, and include the `http.route` attribute.
+Unmatched requests retain the method alone as their span name. Spans are exported in
 background batches and flushed on graceful shutdown. Export failures are logged
 without failing requests. Query strings, headers, bodies, user information and
 exception messages are not recorded. Incoming trace headers are not used; each
 request starts a new trace and is always sampled.
 
-Start the app, request `/healthz` or sign in, then search in Tempo for service
+Start the app, open `/` or sign in, then search in Tempo for service
 `oidc-client-demo`. Allow a few seconds for the export batch to arrive.
