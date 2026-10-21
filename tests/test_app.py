@@ -8,8 +8,8 @@ from starlette.responses import Response
 from starlette.testclient import TestClient
 
 from oidc_client_demo.app import create_app, create_hypercorn_config, run_server
-from oidc_client_demo.auth import OidcInitializationError
-from oidc_client_demo.config import AppConfig
+from oidc_client_demo.auth import OidcInitializationError, register_oidc_client
+from oidc_client_demo.config import AppConfig, OidcConfig
 
 
 @pytest.fixture
@@ -82,6 +82,65 @@ def test_home_page_shows_login(monkeypatch, config_file, oidc_client):
 
     assert response.status_code == 200
     assert "Sign in with OIDC" in response.text
+
+
+@pytest.mark.parametrize("invalid_response", [True, False])
+@pytest.mark.parametrize("client_secret", [None, "test-client-secret"])
+def test_token_exchange(monkeypatch, config_file, invalid_response, client_secret, caplog):
+    # Exercise the real Authlib redirect, session state, PKCE, and token request.
+    app = create_app(str(config_file))
+    oidc = register_oidc_client(
+        app, OidcConfig(issuer="https://idp.example", client_id="test-client", client_secret=client_secret)
+    )
+    oidc.server_metadata.update(
+        _loaded_at=1,
+        authorization_endpoint="https://idp.example/authorize",
+        token_endpoint="https://idp.example/token",
+        userinfo_endpoint="https://idp.example/userinfo",
+    )
+    requests = []
+
+    def provider(request):
+        requests.append(request)
+        if request.url.path == "/userinfo":
+            return httpx2.Response(200, json={"sub": "test-user", "email": "test@example.com"})
+        if invalid_response:
+            return httpx2.Response(422, text="missing client_id; sensitive-provider-detail")
+        return httpx2.Response(200, json={"access_token": "test-access-token", "token_type": "Bearer"})
+
+    oidc.client_kwargs["transport"] = httpx2.MockTransport(provider)
+    monkeypatch.setattr("oidc_client_demo.auth.register_oidc_client", lambda app, config: oidc)
+    with TestClient(app) as client:
+        login = client.get("/login", follow_redirects=False)
+        params = parse_qs(urlparse(login.headers["location"]).query)
+        assert params["code_challenge_method"] == ["S256"]
+        callback = client.get(
+            "/auth/callback", params={"code": "test-code", "state": params["state"][0]}, follow_redirects=False
+        )
+        if invalid_response:
+            assert callback.status_code == 502
+            assert "identity provider returned an invalid token response" in callback.text
+            assert "HTTP 422" in caplog.text
+            assert "sensitive-provider-detail" not in caplog.text + callback.text
+            assert "test-code" not in caplog.text
+            assert not app.state.token_store
+            assert client.get("/profile", follow_redirects=False).headers["location"] == "/login"
+        else:
+            assert callback.status_code == 302
+            assert callback.headers["location"] == "/profile"
+            assert "test@example.com" in client.get("/profile").text
+
+    token_request = requests[0]
+    form = parse_qs(token_request.content.decode())
+    if client_secret:
+        assert token_request.headers["authorization"].startswith("Basic ")
+    else:
+        assert form["client_id"] == ["test-client"]
+        assert "authorization" not in token_request.headers
+    assert form["grant_type"] == ["authorization_code"]
+    assert form["code"] == ["test-code"]
+    assert form["code_verifier"]
+    assert "client_secret" not in form
 
 
 def test_healthz_returns_ok(monkeypatch, config_file, oidc_client):

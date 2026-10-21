@@ -27,6 +27,7 @@ from starlette.types import ASGIApp
 
 from oidc_client_demo.auth import (
     OidcInitializationError,
+    OidcTokenResponseError,
     configure_oidc,
     get_oidc_client,
     get_oidc_metadata,
@@ -68,7 +69,15 @@ async def login(request: Request) -> Response:
 
 async def auth_callback(request: Request) -> Response:
     oidc = get_oidc_client(request.app)
-    token = await oidc.authorize_access_token(request)
+    try:
+        token = await oidc.authorize_access_token(request)
+    except OidcTokenResponseError as exc:
+        logger.warning("Sign-in failed: %s", exc)
+        return Response(
+            "Sign-in failed: the identity provider returned an invalid token response. Try signing in again.",
+            status_code=502,
+            media_type="text/plain",
+        )
     user_info = token.get("userinfo")
     if not user_info:
         user_info = await oidc.userinfo(token=token)

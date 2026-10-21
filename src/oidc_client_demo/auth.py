@@ -21,6 +21,26 @@ class OidcInitializationError(RuntimeError):
     """Raised when the OIDC client cannot be initialized cleanly."""
 
 
+class OidcTokenResponseError(RuntimeError):
+    """The token endpoint returned an unusable response."""
+
+
+def validate_token_response(response: httpx2.Response) -> httpx2.Response:
+    try:
+        result = response.json()
+    except ValueError:
+        raise OidcTokenResponseError(
+            f"OIDC token endpoint returned HTTP {response.status_code} without valid JSON"
+        ) from None
+    if not isinstance(result, dict):
+        raise OidcTokenResponseError(f"OIDC token endpoint returned HTTP {response.status_code} without a JSON object")
+    return response
+
+
+def configure_token_response_validation(client: Any) -> None:
+    client.register_compliance_hook("access_token_response", validate_token_response)
+
+
 def register_oidc_client(app: Starlette, oidc_config: OidcConfig) -> Any:
     del app
     oauth = OAuth()
@@ -31,6 +51,7 @@ def register_oidc_client(app: Starlette, oidc_config: OidcConfig) -> Any:
         server_metadata_url=oidc_config.server_metadata_url,
         client_kwargs={"scope": " ".join(oidc_config.scopes)},
         code_challenge_method="S256",
+        compliance_fix=configure_token_response_validation,
     )
 
 
