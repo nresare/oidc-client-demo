@@ -7,8 +7,6 @@ from typing import Any
 
 import httpx2
 
-GRAPH_ME_URL = "https://graph.microsoft.com/v1.0/me"
-
 
 def token_expiry(token: dict[str, Any]) -> datetime | None:
     expires_at = token.get("expires_at")
@@ -27,7 +25,6 @@ class TokenRecord:
     expires_at: datetime | None
     scope: str | None
     last_refresh: str | None = None
-    last_graph: str | None = None
 
     @classmethod
     def from_response(cls, token: dict[str, Any]) -> "TokenRecord":
@@ -54,16 +51,6 @@ async def refresh_access_token(
     if not isinstance(result, dict):
         return {"error": f"Token endpoint returned HTTP {response.status_code} without an object"}
     if response.status_code >= 400:
-        # Error descriptions can contain tenant details, so display only the protocol error code.
-        error = str(result.get("error", f"HTTP {response.status_code}"))
-        codes = result.get("error_codes")
-        if isinstance(codes, list) and codes and isinstance(codes[0], int):
-            error += f" (AADSTS{codes[0]})"
-        return {"error": error}
+        # Error descriptions can contain provider details, so display only the protocol error code.
+        return {"error": str(result.get("error", f"HTTP {response.status_code}"))}
     return result
-
-
-async def call_graph_me(access_token: str) -> int:
-    async with httpx2.AsyncClient(timeout=10, http2=True) as client:
-        response = await client.get(GRAPH_ME_URL, headers={"Authorization": f"Bearer {access_token}"})
-    return response.status_code

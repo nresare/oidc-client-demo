@@ -190,19 +190,17 @@ def test_callback_stores_user_in_session(monkeypatch, config_file, oidc_client):
     assert "test@example.com" in profile_response.text
 
 
-def test_token_experiment_refreshes_and_calls_graph(monkeypatch, config_file, oidc_client):
+def test_profile_refreshes_tokens(monkeypatch, config_file, oidc_client):
     oidc_client.load_server_metadata.return_value = {"token_endpoint": "https://idp.example/token"}
     oidc_client.authorize_access_token.return_value = {
         "userinfo": {"email": "test@example.com"},
         "access_token": "old-access",
         "refresh_token": "old-refresh",
         "expires_in": 3600,
-        "scope": "User.Read offline_access",
+        "scope": "openid profile email offline_access",
     }
     refresh = AsyncMock(return_value={"access_token": "new-access", "refresh_token": "new-refresh", "expires_in": 3600})
-    graph = AsyncMock(return_value=200)
     monkeypatch.setattr("oidc_client_demo.app.refresh_access_token", refresh)
-    monkeypatch.setattr("oidc_client_demo.app.call_graph_me", graph)
 
     with create_test_client(monkeypatch, config_file, oidc_client) as client:
         client.get("/auth/callback")
@@ -216,13 +214,10 @@ def test_token_experiment_refreshes_and_calls_graph(monkeypatch, config_file, oi
         assert "new-refresh" not in page.text
         assert "old-refresh" not in client.cookies.get("session", "")
         assert "new-refresh" not in client.cookies.get("session", "")
-        assert client.post("/graph-me", data={"csrf_token": csrf}, follow_redirects=False).status_code == 303
-        assert "Graph /me returned HTTP 200" in client.get("/profile").text
         client.get("/logout", follow_redirects=False)
         assert not client.app.state.token_store
 
     refresh.assert_awaited_once_with("https://idp.example/token", "test-client", None, "old-refresh")
-    graph.assert_awaited_once_with("new-access")
 
 
 def test_refresh_failure_and_missing_token(monkeypatch, config_file, oidc_client):
