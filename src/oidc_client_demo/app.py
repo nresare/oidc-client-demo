@@ -34,7 +34,7 @@ from oidc_client_demo.auth import (
     login_required,
 )
 from oidc_client_demo.config import AppConfig, load_config
-from oidc_client_demo.tokens import TokenRecord, call_graph_me, refresh_access_token, token_expiry
+from oidc_client_demo.tokens import TokenRecord, refresh_access_token, token_expiry
 from oidc_client_demo.tracing import RequestTracingMiddleware, create_tracer_provider
 
 logger = logging.getLogger(__name__)
@@ -156,30 +156,12 @@ async def refresh_now(request: Request) -> Response:
             record.refresh_token = replacement
         record.expires_at = token_expiry(result)
         record.scope = result.get("scope", record.scope)
-        record.last_graph = None
         record.last_refresh = (
             f"Refresh succeeded at {datetime.now(UTC).isoformat()}. "
             f"Access token changed: {'yes' if access_changed else 'no'}. "
             f"Replacement refresh token received: {'yes' if replacement else 'no'}. "
             f"Refresh token changed: {'yes' if refresh_changed else 'no'}."
         )
-    return RedirectResponse(url="/profile", status_code=303)
-
-
-@login_required
-async def graph_me(request: Request) -> Response:
-    if not await valid_demo_post(request):
-        return Response(status_code=403)
-    record = session_tokens(request)
-    if record is None or not record.access_token:
-        if record:
-            record.last_graph = "No access token is available."
-        return RedirectResponse(url="/profile", status_code=303)
-    try:
-        status = await call_graph_me(record.access_token)
-        record.last_graph = f"Microsoft Graph /me returned HTTP {status} at {datetime.now(UTC).isoformat()}."
-    except httpx2.HTTPError:
-        record.last_graph = "Microsoft Graph could not be reached."
     return RedirectResponse(url="/profile", status_code=303)
 
 
@@ -250,7 +232,6 @@ def create_app(config_path: str = "config.toml") -> Starlette:
             Route("/auth/callback", auth_callback, name="auth_callback"),
             Route("/profile", profile, name="profile"),
             Route("/refresh", refresh_now, methods=["POST"], name="refresh_now"),
-            Route("/graph-me", graph_me, methods=["POST"], name="graph_me"),
             Route("/logout", logout, name="logout"),
             Mount("/static", StaticFiles(packages=[("oidc_client_demo", "static")]), name="static"),
         ],

@@ -11,8 +11,8 @@ base_url = "http://localhost:8080"
 issuer = "https://id.noa.re"
 client_id = "oidc-client-demo"
 scopes = ["openid", "profile", "email"]
-# For Microsoft Entra, add "offline_access" and "https://graph.microsoft.com/User.Read".
-# Register the callback as a Web redirect URI and put the web app credential in this file:
+# Add "offline_access" to request refresh tokens.
+# If your identity provider requires a client secret, store it in this file:
 # client_secret_path = "client-secret"
 
 # Optional request tracing via OTLP/HTTP (Tempo's HTTP receiver, usually port 4318).
