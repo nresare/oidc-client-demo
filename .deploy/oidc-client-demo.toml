@@ -14,7 +14,7 @@ tls_key_path = "/tls/tls.key"
 #, "https://graph.microsoft.com/User.Read"]
 issuer = "https://id.noa.re"
 client_id = "oidc-client-demo"
-scopes = ["openid", "profile", "email"]
+scopes = ["openid", "profile", "email", "offline_access"]
 client_secret_path = "/secret/client_id"
 
 
