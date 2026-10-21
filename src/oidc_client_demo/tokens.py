@@ -21,7 +21,6 @@ def token_expiry(token: dict[str, Any]) -> datetime | None:
 @dataclass
 class TokenRecord:
     access_token: str | None
-    refresh_token: str | None
     expires_at: datetime | None
     scope: str | None
     last_refresh: str | None = None
@@ -30,7 +29,6 @@ class TokenRecord:
     def from_response(cls, token: dict[str, Any]) -> "TokenRecord":
         return cls(
             access_token=token.get("access_token"),
-            refresh_token=token.get("refresh_token"),
             expires_at=token_expiry(token),
             scope=token.get("scope"),
         )

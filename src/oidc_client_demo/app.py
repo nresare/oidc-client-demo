@@ -17,7 +17,6 @@ from hypercorn.config import Config as HypercornConfig
 from hypercorn.typing import Framework
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
-from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.routing import Mount, Route
@@ -34,6 +33,7 @@ from oidc_client_demo.auth import (
     login_required,
 )
 from oidc_client_demo.config import AppConfig, load_config
+from oidc_client_demo.sessions import EncryptedSessionMiddleware
 from oidc_client_demo.tokens import TokenRecord, refresh_access_token, token_expiry
 from oidc_client_demo.tracing import RequestTracingMiddleware, create_tracer_provider
 
@@ -94,26 +94,32 @@ async def auth_callback(request: Request) -> Response:
     session_id = secrets.token_urlsafe(32)
     request.session["demo_session_id"] = session_id
     request.session["demo_csrf"] = secrets.token_urlsafe(32)
+    request.session["refresh_token"] = token.get("refresh_token")
     request.app.state.token_store[session_id] = TokenRecord.from_response(token)
     return RedirectResponse(url="/profile", status_code=302)
 
 
 @login_required
 async def profile(request: Request) -> Response:
-    record = request.app.state.token_store.get(request.session.get("demo_session_id"))
+    session_id = request.session["demo_session_id"]
+    if session_id not in request.app.state.token_store and request.session.get("refresh_token"):
+        await refresh_session_tokens(request)
+    record = session_tokens(request)
     return TEMPLATES.TemplateResponse(
         request,
         "profile.html",
         {
             "user": request.session["user"],
             "token": record,
+            "has_refresh_token": bool(request.session.get("refresh_token")),
             "csrf_token": request.session.get("demo_csrf"),
         },
     )
 
 
-def session_tokens(request: Request) -> TokenRecord | None:
-    return request.app.state.token_store.get(request.session.get("demo_session_id"))
+def session_tokens(request: Request) -> TokenRecord:
+    session_id = request.session["demo_session_id"]
+    return request.app.state.token_store.setdefault(session_id, TokenRecord.from_response({}))
 
 
 async def valid_demo_post(request: Request) -> bool:
@@ -126,22 +132,27 @@ async def valid_demo_post(request: Request) -> bool:
 async def refresh_now(request: Request) -> Response:
     if not await valid_demo_post(request):
         return Response(status_code=403)
+    await refresh_session_tokens(request)
+    return RedirectResponse(url="/profile", status_code=303)
+
+
+async def refresh_session_tokens(request: Request) -> None:
     record = session_tokens(request)
-    if record is None or not record.refresh_token:
-        if record:
-            record.last_refresh = "No refresh token was issued. Check the offline_access scope."
-        return RedirectResponse(url="/profile", status_code=303)
+    refresh_token = request.session.get("refresh_token")
+    if not refresh_token:
+        record.last_refresh = "No refresh token was issued. Check the offline_access scope."
+        return
 
     config = request.app.state.settings.oidc
     endpoint = get_oidc_metadata(request.app).get("token_endpoint")
     if not endpoint:
         record.last_refresh = "The provider metadata has no token endpoint."
-        return RedirectResponse(url="/profile", status_code=303)
+        return
     try:
-        result = await refresh_access_token(endpoint, config.client_id, config.client_secret, record.refresh_token)
+        result = await refresh_access_token(endpoint, config.client_id, config.client_secret, refresh_token)
     except httpx2.HTTPError:
         record.last_refresh = "The token endpoint could not be reached."
-        return RedirectResponse(url="/profile", status_code=303)
+        return
 
     if "error" in result:
         record.last_refresh = f"Refresh failed: {result['error']}. Sign in again if the token expired or was revoked."
@@ -150,10 +161,10 @@ async def refresh_now(request: Request) -> Response:
     else:
         access_changed = result["access_token"] != record.access_token
         replacement = result.get("refresh_token")
-        refresh_changed = bool(replacement and replacement != record.refresh_token)
+        refresh_changed = bool(replacement and replacement != refresh_token)
         record.access_token = result["access_token"]
         if replacement:
-            record.refresh_token = replacement
+            request.session["refresh_token"] = replacement
         record.expires_at = token_expiry(result)
         record.scope = result.get("scope", record.scope)
         record.last_refresh = (
@@ -162,7 +173,7 @@ async def refresh_now(request: Request) -> Response:
             f"Replacement refresh token received: {'yes' if replacement else 'no'}. "
             f"Refresh token changed: {'yes' if refresh_changed else 'no'}."
         )
-    return RedirectResponse(url="/profile", status_code=303)
+    return
 
 
 async def logout(request: Request) -> Response:
@@ -217,7 +228,7 @@ def create_app(config_path: str = "config.toml") -> Starlette:
 
     middleware = [
         Middleware(
-            SessionMiddleware,
+            EncryptedSessionMiddleware,
             secret_key=config.app.secret_key,
             https_only=config.app.base_url.startswith("https://"),
         )

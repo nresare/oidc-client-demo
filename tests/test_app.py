@@ -1,3 +1,4 @@
+import json
 import re
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlparse
@@ -10,6 +11,7 @@ from starlette.testclient import TestClient
 from oidc_client_demo.app import create_app, create_hypercorn_config, run_server
 from oidc_client_demo.auth import OidcInitializationError, register_oidc_client
 from oidc_client_demo.config import AppConfig, OidcConfig
+from oidc_client_demo.sessions import EncryptedSessionMiddleware
 
 
 @pytest.fixture
@@ -214,10 +216,19 @@ def test_profile_refreshes_tokens(monkeypatch, config_file, oidc_client):
         assert "new-refresh" not in page.text
         assert "old-refresh" not in client.cookies.get("session", "")
         assert "new-refresh" not in client.cookies.get("session", "")
+        assert decrypted_session(client)["refresh_token"] == "new-refresh"
         client.get("/logout", follow_redirects=False)
         assert not client.app.state.token_store
 
     refresh.assert_awaited_once_with("https://idp.example/token", "test-client", None, "old-refresh")
+
+
+def session_cipher(client):
+    return EncryptedSessionMiddleware(client.app, client.app.state.settings.app.secret_key).cipher
+
+
+def decrypted_session(client):
+    return json.loads(session_cipher(client).decrypt(client.cookies.get("session").encode()))
 
 
 def test_refresh_failure_and_missing_token(monkeypatch, config_file, oidc_client):
@@ -235,12 +246,67 @@ def test_refresh_failure_and_missing_token(monkeypatch, config_file, oidc_client
         assert client.post("/refresh", data={"csrf_token": "wrong"}).status_code == 403
         client.post("/refresh", data={"csrf_token": csrf})
         assert "Refresh failed: invalid_grant" in client.get("/profile").text
-        assert next(iter(client.app.state.token_store.values())).refresh_token == "old-refresh"
+        assert decrypted_session(client)["refresh_token"] == "old-refresh"
 
-        next(iter(client.app.state.token_store.values())).refresh_token = None
-        client.post("/refresh", data={"csrf_token": csrf})
+        # A subsequent sign-in without a refresh token removes the previous one.
+        oidc_client.authorize_access_token.return_value.pop("refresh_token")
+        client.get("/auth/callback")
+        client.post("/refresh", data={"csrf_token": csrf_from_profile(client)})
         assert "No refresh token was issued" in client.get("/profile").text
     refresh.assert_awaited_once()
+
+
+@pytest.mark.parametrize("replacement", [None, "rotated-refresh"])
+def test_encrypted_session_recovers_after_restart(monkeypatch, config_file, oidc_client, replacement):
+    oidc_client.load_server_metadata.return_value = {"token_endpoint": "https://idp.example/token"}
+    oidc_client.authorize_access_token.return_value = {
+        "userinfo": {"email": "test@example.com"},
+        "access_token": "large-access-" + "x" * 10000,
+        "id_token": "large-id-" + "y" * 10000,
+        "refresh_token": "original-refresh",
+    }
+    result = {"access_token": "recovered-access", "expires_in": 3600}
+    if replacement:
+        result["refresh_token"] = replacement
+    refresh = AsyncMock(return_value=result)
+    monkeypatch.setattr("oidc_client_demo.app.refresh_access_token", refresh)
+    with create_test_client(monkeypatch, config_file, oidc_client) as first:
+        first.get("/auth/callback")
+        cookie = first.cookies.get("session")
+        payload = decrypted_session(first)
+        assert payload["refresh_token"] == "original-refresh"
+        assert "access_token" not in payload and "id_token" not in payload
+        assert "test@example.com" not in cookie and "original-refresh" not in cookie
+        assert len(cookie) < 4096
+        assert not hasattr(next(iter(first.app.state.token_store.values())), "refresh_token")
+
+    with create_test_client(monkeypatch, config_file, oidc_client) as restarted:
+        restarted.cookies.set("session", cookie, domain="testserver.local", path="/")
+        assert not restarted.app.state.token_store
+        page = restarted.get("/profile")
+        assert "test@example.com" in page.text and "Refresh succeeded" in page.text
+        assert next(iter(restarted.app.state.token_store.values())).access_token == "recovered-access"
+        assert decrypted_session(restarted)["refresh_token"] == (replacement or "original-refresh")
+        restarted.get("/profile")
+        refresh.assert_awaited_once_with("https://idp.example/token", "test-client", None, "original-refresh")
+        restarted.get("/logout", follow_redirects=False)
+        assert not restarted.cookies.get("session")
+        assert not restarted.app.state.token_store
+        assert restarted.get("/profile", follow_redirects=False).headers["location"] == "/login"
+
+
+def test_oversized_refresh_token_is_rejected(monkeypatch, config_file, oidc_client):
+    oidc_client.authorize_access_token.return_value = {
+        "userinfo": {"email": "test@example.com"},
+        "access_token": "access",
+        "refresh_token": "x" * 4000,
+    }
+    with create_test_client(monkeypatch, config_file, oidc_client) as client:
+        response = client.get("/auth/callback", follow_redirects=False)
+        assert response.status_code == 400
+        assert "too large" in response.text
+        assert not client.cookies.get("session")
+        assert client.get("/profile", follow_redirects=False).headers["location"] == "/login"
 
 
 def test_profile_page_shows_only_email(monkeypatch, config_file, oidc_client):
@@ -460,3 +526,31 @@ def test_tracing_excludes_exact_paths_and_names_parameterized_routes(monkeypatch
     assert len(spans) == 3
     assert [span.name for span in spans] == ["GET", "GET /users/{user_id}", "GET /users/{user_id}"]
     assert all(span.attributes["http.route"] == "/users/{user_id}" for span in spans[1:])
+
+
+@pytest.mark.parametrize("refresh_token", [None, "expired-refresh"])
+def test_cache_loss_without_usable_refresh_token(monkeypatch, config_file, oidc_client, refresh_token):
+    oidc_client.load_server_metadata.return_value = {"token_endpoint": "https://idp.example/token"}
+    oidc_client.authorize_access_token.return_value = {
+        "userinfo": {"email": "test@example.com"},
+        "access_token": "original-access",
+        "refresh_token": refresh_token,
+    }
+    refresh = AsyncMock(return_value={"error": "invalid_grant"})
+    monkeypatch.setattr("oidc_client_demo.app.refresh_access_token", refresh)
+    with create_test_client(monkeypatch, config_file, oidc_client) as client:
+        client.get("/auth/callback")
+        client.app.state.token_store.clear()
+        page = client.get("/profile")
+        assert page.status_code == 200
+        assert "test@example.com" in page.text
+        assert 'name="csrf_token"' in page.text
+        assert "Start a new sign-in" in page.text
+        assert next(iter(client.app.state.token_store.values())).access_token is None
+        if refresh_token:
+            assert "Refresh failed: invalid_grant" in page.text
+            assert decrypted_session(client)["refresh_token"] == refresh_token
+            client.get("/profile")
+            refresh.assert_awaited_once()
+        else:
+            refresh.assert_not_awaited()
