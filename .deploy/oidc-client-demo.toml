@@ -1,21 +1,21 @@
 # Application configuration for oidc-client-demo
 
 [app]
-secret_key_path = "/random-secrets/session-key"
-base_url = "https://demo.resare.com"
+secret-key-path = "/random-secrets/session-key"
+base-url = "https://demo.resare.com"
 # PEM files from the website-generated TLS Secret; enables the HTTPS listener on 8443.
-tls_cert_path = "/tls/tls.crt"
-tls_key_path = "/tls/tls.key"
+tls-cert-path = "/tls/tls.crt"
+tls-key-path = "/tls/tls.key"
 
 [oidc]
 issuer = "https://id.noa.re"
-client_id = "oidc-client-demo"
+client-id = "oidc-client-demo"
 scopes = ["openid", "profile", "email", "offline_access"]
-client_secret_path = "/secret/client_id"
+client-secret-path = "/secret/client_id"
 
 
-[otel]
+[traces]
 endpoint = "http://tempo.tempo.svc:4318/v1/traces"
-service_name = "oidc-client-demo"
+service-name = "oidc-client-demo"
 
-excluded_paths = ["/healthz"]
+excluded-paths = ["/healthz"]

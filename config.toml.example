@@ -1,23 +1,23 @@
 # Application configuration for oidc-client-demo
 
 [app]
-secret_key_path = "session-key"
-base_url = "http://localhost:8080"
+secret-key-path = "session-key"
+base-url = "http://localhost:8080"
 # Optional HTTPS listener with HTTP/2 via ALPN; set both PEM file paths.
-# tls_cert_path = "tls/cert.pem"
-# tls_key_path = "tls/key.pem"
+# tls-cert-path = "tls/cert.pem"
+# tls-key-path = "tls/key.pem"
 
 [oidc]
 issuer = "https://id.noa.re"
-client_id = "oidc-client-demo"
+client-id = "oidc-client-demo"
 scopes = ["openid", "profile", "email"]
 # Add "offline_access" to request refresh tokens.
 # If your identity provider requires a client secret, store it in this file:
-# client_secret_path = "client-secret"
+# client-secret-path = "client-secret"
 
 # Optional request tracing via OTLP/HTTP (Tempo's HTTP receiver, usually port 4318).
-# [otel]
+# [traces]
 # endpoint = "http://localhost:4318/v1/traces"
-# service_name = "oidc-client-demo"
+# service-name = "oidc-client-demo"
 
-# excluded_paths = ["/healthz"]
+# excluded-paths = ["/healthz"]

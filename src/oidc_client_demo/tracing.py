@@ -9,10 +9,10 @@ from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 from opentelemetry.trace import SpanKind, StatusCode, Tracer
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from oidc_client_demo.config import OtelConfig
+from oidc_client_demo.config import TracesConfig
 
 
-def create_tracer_provider(config: OtelConfig) -> TracerProvider:
+def create_tracer_provider(config: TracesConfig) -> TracerProvider:
     provider = TracerProvider(resource=Resource.create({"service.name": config.service_name}), sampler=ALWAYS_ON)
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=config.endpoint)))
     return provider
