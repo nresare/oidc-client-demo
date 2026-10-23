@@ -3,10 +3,10 @@ import pytest
 from oidc_client_demo.config import Config, load_config
 
 
-def write_config(tmp_path, app_config='secret_key_path = "session-key"'):
+def write_config(tmp_path, app_config='secret-key-path = "session-key"'):
     config_path = tmp_path / "config.toml"
     config_path.write_text(
-        f'[app]\n{app_config}\n\n[oidc]\nissuer = "http://localhost:9000"\nclient_id = "my-client"\n'
+        f'[app]\n{app_config}\n\n[oidc]\nissuer = "http://localhost:9000"\nclient-id = "my-client"\n'
     )
     return str(config_path)
 
@@ -29,19 +29,19 @@ def test_load_config_defaults(tmp_path):
 def test_load_config_absolute_secret_path(tmp_path):
     secret_path = tmp_path / "mounted-key"
     secret_path.write_text("random-secret")
-    config = load_config(write_config(tmp_path, f'secret_key_path = "{secret_path}"'))
+    config = load_config(write_config(tmp_path, f'secret-key-path = "{secret_path}"'))
     assert config.app.secret_key == "random-secret"
 
 
-@pytest.mark.parametrize("app_config", ["", 'secret_key_path = ""', 'secret_key_path = "  "', "secret_key_path = 123"])
+@pytest.mark.parametrize("app_config", ["", 'secret-key-path = ""', 'secret-key-path = "  "', "secret-key-path = 123"])
 def test_load_config_requires_secret_path(tmp_path, app_config):
-    with pytest.raises(ValueError, match="app.secret_key_path"):
+    with pytest.raises(ValueError, match="app.secret-key-path"):
         load_config(write_config(tmp_path, app_config))
 
 
 def test_load_config_rejects_inline_secret(tmp_path):
     with pytest.raises(ValueError, match="no longer supported"):
-        load_config(write_config(tmp_path, 'secret_key = "old-secret"'))
+        load_config(write_config(tmp_path, 'secret-key = "old-secret"'))
 
 
 def test_load_config_missing_secret_file(tmp_path):
@@ -59,7 +59,7 @@ def test_load_config_empty_secret_file(tmp_path, contents):
 def test_load_config_requires_oidc_fields(tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text('[oidc]\nissuer = "http://localhost:9000"\n')
-    with pytest.raises(ValueError, match="Missing required OIDC configuration fields: client_id"):
+    with pytest.raises(ValueError, match="Missing required OIDC configuration fields: client-id"):
         load_config(str(config_path))
 
 
@@ -68,15 +68,18 @@ def test_load_config_reads_oidc_client_secret_from_file(tmp_path):
     (tmp_path / "client-secret").write_text("client-secret-value\n")
     config_path = write_config(tmp_path)
     with open(config_path, "a") as config_file:
-        config_file.write('client_secret_path = "client-secret"\n')
+        config_file.write('client-secret-path = "client-secret"\n')
     assert load_config(config_path).oidc.client_secret == "client-secret-value"
 
 
 @pytest.mark.parametrize(
     ("extra_config", "unknown_parameter"),
     [
-        ('\nclient_seret_path = "/secret/client-secret"', "oidc.client_seret_path"),
+        ('\nclient-seret-path = "/secret/client-secret"', "oidc.client-seret-path"),
         ('\n[extra]\nvalue = "ignored"', "extra"),
+        ('\nclient_id = "old-client"', "oidc.client_id"),
+        ('\n[otel]\nendpoint = "http://tempo:4318/v1/traces"', "otel"),
+        ('\n[traces]\nservice_name = "demo"', "traces.service_name"),
     ],
 )
 def test_load_config_rejects_unknown_parameters(tmp_path, extra_config, unknown_parameter):
@@ -89,32 +92,33 @@ def test_load_config_rejects_unknown_parameters(tmp_path, extra_config, unknown_
     assert str(exc_info.value) == f"Unknown configuration parameter(s): {unknown_parameter}"
 
 
-def test_load_config_rejects_unknown_app_parameter(tmp_path):
-    config_path = write_config(tmp_path, 'secret_key_path = "session-key"\nsecreet_key_path = "session-key"')
+@pytest.mark.parametrize("name", ["secreet-key-path", "secret_key_path", "base_url", "tls_cert_path", "tls_key_path"])
+def test_load_config_rejects_unknown_app_parameter(tmp_path, name):
+    config_path = write_config(tmp_path, f'secret-key-path = "session-key"\n{name} = "session-key"')
 
     with pytest.raises(ValueError) as exc_info:
         load_config(config_path)
-    assert str(exc_info.value) == "Unknown configuration parameter(s): app.secreet_key_path"
+    assert str(exc_info.value) == f"Unknown configuration parameter(s): app.{name}"
 
 
-def test_load_config_otel(tmp_path):
+def test_load_config_traces(tmp_path):
     (tmp_path / "session-key").write_text("test-secret")
     path = write_config(tmp_path)
     with open(path, "a") as f:
-        f.write('\n[otel]\nendpoint = "http://tempo:4318/v1/traces"\n')
+        f.write('\n[traces]\nendpoint = "http://tempo:4318/v1/traces"\n')
     config = load_config(path)
-    assert config.otel is not None
-    assert config.otel.endpoint == "http://tempo:4318/v1/traces"
-    assert config.otel.service_name == "oidc-client-demo"
+    assert config.traces is not None
+    assert config.traces.endpoint == "http://tempo:4318/v1/traces"
+    assert config.traces.service_name == "oidc-client-demo"
 
 
 @pytest.mark.parametrize("endpoint", ['""', "123", '"grpc://tempo:4317"'])
-def test_load_config_invalid_otel(tmp_path, endpoint):
+def test_load_config_invalid_traces(tmp_path, endpoint):
     (tmp_path / "session-key").write_text("test-secret")
     path = write_config(tmp_path)
     with open(path, "a") as f:
-        f.write(f"\n[otel]\nendpoint = {endpoint}\n")
-    with pytest.raises(ValueError, match="otel.endpoint"):
+        f.write(f"\n[traces]\nendpoint = {endpoint}\n")
+    with pytest.raises(ValueError, match="traces.endpoint"):
         load_config(path)
 
 
@@ -124,7 +128,7 @@ def test_load_config_tls_paths(tmp_path, absolute):
     cert = str(tmp_path / "cert.pem") if absolute else "cert.pem"
     key = str(tmp_path / "key.pem") if absolute else "key.pem"
     config = load_config(
-        write_config(tmp_path, f'secret_key_path = "session-key"\ntls_cert_path = "{cert}"\ntls_key_path = "{key}"')
+        write_config(tmp_path, f'secret-key-path = "session-key"\ntls-cert-path = "{cert}"\ntls-key-path = "{key}"')
     )
     assert config.app.tls_cert_path == str(tmp_path / "cert.pem")
     assert config.app.tls_key_path == str(tmp_path / "key.pem")
@@ -133,18 +137,18 @@ def test_load_config_tls_paths(tmp_path, absolute):
 @pytest.mark.parametrize(
     "tls_config",
     [
-        'tls_cert_path = "cert.pem"',
-        'tls_key_path = "key.pem"',
-        'tls_cert_path = ""\ntls_key_path = "key.pem"',
-        'tls_cert_path = "cert.pem"\ntls_key_path = "  "',
-        'tls_cert_path = 123\ntls_key_path = "key.pem"',
-        'tls_cert_path = "cert.pem"\ntls_key_path = false',
+        'tls-cert-path = "cert.pem"',
+        'tls-key-path = "key.pem"',
+        'tls-cert-path = ""\ntls-key-path = "key.pem"',
+        'tls-cert-path = "cert.pem"\ntls-key-path = "  "',
+        'tls-cert-path = 123\ntls-key-path = "key.pem"',
+        'tls-cert-path = "cert.pem"\ntls-key-path = false',
     ],
 )
 def test_load_config_requires_valid_tls_pair(tmp_path, tls_config):
     (tmp_path / "session-key").write_text("test-secret")
     with pytest.raises(ValueError, match="TLS requires both"):
-        load_config(write_config(tmp_path, f'secret_key_path = "session-key"\n{tls_config}'))
+        load_config(write_config(tmp_path, f'secret-key-path = "session-key"\n{tls_config}'))
 
 
 @pytest.mark.parametrize("value", ['"/healthz"', "[123]", '["healthz"]', '["/healthz?x=1"]', '["/healthz#x"]'])
@@ -152,6 +156,6 @@ def test_load_config_rejects_invalid_excluded_paths(tmp_path, value):
     (tmp_path / "session-key").write_text("test-secret")
     path = write_config(tmp_path)
     with open(path, "a") as f:
-        f.write(f'\n[otel]\nendpoint = "http://tempo:4318/v1/traces"\nexcluded_paths = {value}\n')
-    with pytest.raises(ValueError, match="otel.excluded_paths"):
+        f.write(f'\n[traces]\nendpoint = "http://tempo:4318/v1/traces"\nexcluded-paths = {value}\n')
+    with pytest.raises(ValueError, match="traces.excluded-paths"):
         load_config(path)

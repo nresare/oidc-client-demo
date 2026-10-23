@@ -14,6 +14,7 @@ It is somewhat inspired by https://github.com/noa-portswigger/flask-lab
 ## Configuration
 
 Copy `config.toml.example` to `config.toml` and update the values for your identity provider.
+Configuration keys use kebab-case, and optional request tracing is configured in `[traces]`.
 Unknown configuration sections and parameters cause startup to fail with their names in the error.
 The identity provider you use needs to support PKCE which enables integration without a
 client secret.
@@ -39,10 +40,10 @@ To enable TLS on the listener, set both PEM file paths in `[app]`:
 
 ```toml
 [app]
-secret_key_path = "session-key"
-base_url = "https://demo.example.com"
-tls_cert_path = "tls/cert.pem"
-tls_key_path = "tls/key.pem"
+secret-key-path = "session-key"
+base-url = "https://demo.example.com"
+tls-cert-path = "tls/cert.pem"
+tls-key-path = "tls/key.pem"
 ```
 
 Relative paths are resolved from the configuration file's directory. Supply a PEM
@@ -56,7 +57,7 @@ using TLS with HTTP/2, trust the certificate's issuer, and use a server name tha
 matches the certificate. Health checks must also use HTTPS. Omit both paths to
 keep the plain HTTP listener.
 
-`app.base_url` remains the public URL used for OIDC redirects and session cookie
+`app.base-url` remains the public URL used for OIDC redirects and session cookie
 settings; it can differ from the proxy's upstream address. For direct local HTTPS,
 set it to `https://localhost:8443` and register the corresponding callback URL.
 
@@ -71,12 +72,12 @@ To request refresh tokens, add `"offline_access"` to `oidc.scopes`, for example
 `["openid", "profile", "email", "offline_access"]`, and enable refresh-token issuance
 for your client at the identity provider if required. If your provider requires a
 client secret, save it in a local `client-secret` file (mode `0600`) beside
-`config.toml` and set `oidc.client_secret_path = "client-secret"`.
+`config.toml` and set `oidc.client-secret-path = "client-secret"`.
 
 The app never displays token values. Session data, including the refresh token,
 is stored in an authenticated, encrypted browser cookie using a key derived from
-`app.secret_key_path`. The cookie is HttpOnly, uses SameSite=Lax, and is marked
-Secure when `app.base_url` uses HTTPS. Sessions expire after 14 days without a
+`app.secret-key-path`. The cookie is HttpOnly, uses SameSite=Lax, and is marked
+Secure when `app.base-url` uses HTTPS. Sessions expire after 14 days without a
 session update. Refresh-token rotation updates the cookie; if no replacement is
 issued, the existing refresh token is retained.
 
@@ -95,10 +96,10 @@ token, but does not revoke tokens at the identity provider or invalidate a copie
 cookie. A refresh failure displays the protocol error code and leaves the option
 to sign in again.
 
-Set `app.secret_key_path` to a UTF-8 file containing the session encryption secret.
+Set `app.secret-key-path` to a UTF-8 file containing the session encryption secret.
 Relative paths are resolved from the configuration file's directory. Leading and
 trailing whitespace is stripped; missing or empty files prevent startup. Inline
-`app.secret_key` values are no longer supported. Keep the key stable across restarts
+`app.secret-key` values are no longer supported. Keep the key stable across restarts
 to preserve sessions; replacing it invalidates existing sessions.
 
 The deployment manifest requests `random-secret = "session-key"`, which mounts the
@@ -117,17 +118,17 @@ check to HTTPS. This requires the website plugin update in
 To enable tracing, add this section to your configuration:
 
 ```toml
-[otel]
+[traces]
 endpoint = "http://localhost:4318/v1/traces"
-service_name = "oidc-client-demo"
-excluded_paths = ["/healthz"]
+service-name = "oidc-client-demo"
+excluded-paths = ["/healthz"]
 ```
 
 Use the full OTLP/HTTP traces URL, including `/v1/traces`, for your Tempo or
 collector receiver (not the gRPC port 4317). The service name is optional and
-defaults to `oidc-client-demo`. Omit `[otel]` to disable tracing.
+defaults to `oidc-client-demo`. Omit `[traces]` to disable tracing.
 
-`excluded_paths` skips tracing for exact URL paths, regardless of method or query
+`excluded-paths` skips tracing for exact URL paths, regardless of method or query
 string. It defaults to an empty list. The deployment excludes `/healthz`.
 
 Each remaining HTTP request creates one server span with its method, path, status

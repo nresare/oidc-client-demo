@@ -209,14 +209,14 @@ def create_app(config_path: str = "config.toml") -> Starlette:
 
     @asynccontextmanager
     async def lifespan(app: Starlette):
-        provider = create_tracer_provider(config.otel) if config.otel else None
+        provider = create_tracer_provider(config.traces) if config.traces else None
         app.state.tracer_provider = provider
         original_stack = app.middleware_stack
-        if provider and config.otel:
+        if provider and config.traces:
             app.middleware_stack = RequestTracingMiddleware(
                 cast(ASGIApp, original_stack),
                 tracer=provider.get_tracer("oidc_client_demo"),
-                excluded_paths=config.otel.excluded_paths,
+                excluded_paths=config.traces.excluded_paths,
             )
         try:
             await configure_oidc(app)

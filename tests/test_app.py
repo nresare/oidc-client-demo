@@ -21,12 +21,12 @@ def config_file(tmp_path):
     config_path.write_text(
         """
 [app]
-secret_key_path = "session-key"
-base_url = "http://localhost:8080"
+secret-key-path = "session-key"
+base-url = "http://localhost:8080"
 
 [oidc]
 issuer = "http://localhost:9000"
-client_id = "test-client"
+client-id = "test-client"
 """.strip()
     )
     return config_path
@@ -54,12 +54,12 @@ def write_config(tmp_path, base_url: str):
     config_path.write_text(
         f"""
 [app]
-secret_key_path = "session-key"
-base_url = "{base_url}"
+secret-key-path = "session-key"
+base-url = "{base_url}"
 
 [oidc]
 issuer = "http://localhost:9000"
-client_id = "test-client"
+client-id = "test-client"
 """.strip()
     )
     return config_path
@@ -415,7 +415,7 @@ def test_request_tracing_exports_one_span_per_request(monkeypatch, config_file, 
     exporter.export.return_value = SpanExportResult.SUCCESS
     monkeypatch.setattr("oidc_client_demo.tracing.OTLPSpanExporter", lambda **kwargs: exporter)
     with config_file.open("a") as f:
-        f.write('\n[otel]\nendpoint = "http://tempo:4318/v1/traces"\n')
+        f.write('\n[traces]\nendpoint = "http://tempo:4318/v1/traces"\n')
     with create_test_client(monkeypatch, config_file, oidc_client) as client:
         assert client.get("/healthz?code=secret").status_code == 200
         assert client.get("/missing").status_code == 404
@@ -467,7 +467,7 @@ def test_request_tracing_submits_otlp_http(monkeypatch, config_file, oidc_client
     thread.start()
     try:
         with config_file.open("a") as f:
-            f.write(f'\n[otel]\nendpoint = "http://127.0.0.1:{server.server_port}/v1/traces"\n')
+            f.write(f'\n[traces]\nendpoint = "http://127.0.0.1:{server.server_port}/v1/traces"\n')
         with create_test_client(monkeypatch, config_file, oidc_client) as client:
             assert client.get("/healthz").status_code == 200
         assert len(received) == 1
@@ -510,7 +510,7 @@ def test_tracing_excludes_exact_paths_and_names_parameterized_routes(monkeypatch
     exporter.export.return_value = SpanExportResult.SUCCESS
     monkeypatch.setattr("oidc_client_demo.tracing.OTLPSpanExporter", lambda **kwargs: exporter)
     with config_file.open("a") as f:
-        f.write('\n[otel]\nendpoint = "http://tempo:4318/v1/traces"\nexcluded_paths = ["/healthz"]\n')
+        f.write('\n[traces]\nendpoint = "http://tempo:4318/v1/traces"\nexcluded-paths = ["/healthz"]\n')
 
     async def user(request):
         return Response(status_code=204)
