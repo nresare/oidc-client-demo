@@ -113,6 +113,35 @@ The website block adds that namespace label and switches the service and health
 check to HTTPS. This requires the website plugin update in
 [system PR #62](https://github.com/nresare/system/pull/62) before deployment.
 
+## Access token inspection
+
+The profile page displays access-token validation results and JSON claims when
+the provider returns a readable signed JWT. Configure `oidc.access-token-audiences`
+with the intended API's audience identifiers to enable validation. Optionally set
+`oidc.access-token-required-scopes` to require delegated permissions in `scp`:
+
+```toml
+access-token-audiences = ["<api-application-id>", "api://<api-application-id>"]
+access-token-required-scopes = ["Full"]
+```
+
+Validation checks the signature using the provider's published signing keys,
+the issuer, audience, expiry, any not-before/issued-at timestamps, and configured
+delegated scopes. The audience is the target API, not this demo's client ID.
+For Entra, configure a tenant-GUID issuer such as
+`https://login.microsoftonline.com/<tenant-id>/v2.0`. The demo handles both v1
+and v2 access tokens, selecting the corresponding discovery endpoint and expected
+issuer for that same tenant. No Entra token-version manifest change is required.
+Register the demo's callback as a Web redirect URI and configure its client secret;
+PKCE does not replace client authentication for Entra confidential web clients.
+
+Opaque/encrypted tokens and tokens without configured audiences are reported as
+not validated. Decodable claims from tokens that have not passed validation are
+explicitly labeled unverified. Claims are diagnostic information for the API you
+configure; they do not change sign-in or implement the API's ownership or role
+policies. Raw tokens are never displayed. Validation fetches signing keys on each
+profile view and checks the current token again after refresh, including expiry.
+
 ## Request tracing with Tempo
 
 To enable tracing, add this section to your configuration:

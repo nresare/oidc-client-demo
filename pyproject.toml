@@ -6,6 +6,7 @@ license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "authlib",
+    "joserfc>=1.7.5",
     "click",
     "hypercorn",
     "cryptography",

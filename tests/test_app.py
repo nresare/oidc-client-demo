@@ -8,6 +8,7 @@ import pytest
 from starlette.responses import Response
 from starlette.testclient import TestClient
 
+from oidc_client_demo.access_tokens import AccessTokenInspection
 from oidc_client_demo.app import create_app, create_hypercorn_config, run_server
 from oidc_client_demo.auth import OidcInitializationError, register_oidc_client
 from oidc_client_demo.config import AppConfig, OidcConfig
@@ -84,6 +85,64 @@ def test_home_page_shows_login(monkeypatch, config_file, oidc_client):
 
     assert response.status_code == 200
     assert "Sign in with OIDC" in response.text
+
+
+@pytest.mark.parametrize("status", ["Valid", "Invalid", "Not validated"])
+def test_profile_displays_validation_and_escaped_claims(monkeypatch, config_file, oidc_client, status):
+    oidc_client.authorize_access_token.return_value = {
+        "userinfo": {"sub": "alice"},
+        "access_token": "private-access-token",
+        "refresh_token": "private-refresh-token",
+    }
+    inspect = AsyncMock(
+        return_value=AccessTokenInspection(
+            status,
+            "Diagnostic result",
+            {"scp": "Full", "name": "<script>alert(1)</script>"},
+            "https://issuer.example",
+            ["api-audience"],
+        )
+    )
+    monkeypatch.setattr("oidc_client_demo.app.inspect_access_token", inspect)
+    with create_test_client(monkeypatch, config_file, oidc_client) as client:
+        client.get("/auth/callback", follow_redirects=False)
+        response = client.get("/profile")
+    assert f"<dd>{status}</dd>" in response.text
+    assert '"scp": "Full"' in response.text
+    assert "https://issuer.example" in response.text
+    assert "api-audience" in response.text
+    assert ("Unverified claims" in response.text) == (status != "Valid")
+    assert "<script>" not in response.text
+    assert "private-access-token" not in response.text
+    assert "private-refresh-token" not in response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert inspect.call_args.args[0] == "private-access-token"
+
+
+def test_profile_validates_replacement_access_token_after_refresh(monkeypatch, config_file, oidc_client):
+    oidc_client.authorize_access_token.return_value = {
+        "userinfo": {"sub": "alice"},
+        "access_token": "initial-token",
+        "refresh_token": "refresh-token",
+    }
+    oidc_client.load_server_metadata.return_value = {"token_endpoint": "https://idp.example/token"}
+    inspect = AsyncMock(return_value=AccessTokenInspection("Valid", "Checks passed"))
+    monkeypatch.setattr("oidc_client_demo.app.inspect_access_token", inspect)
+    monkeypatch.setattr(
+        "oidc_client_demo.app.refresh_access_token",
+        AsyncMock(
+            return_value={
+                "access_token": "replacement-token",
+                "expires_in": 3600,
+            }
+        ),
+    )
+    with create_test_client(monkeypatch, config_file, oidc_client) as client:
+        client.get("/auth/callback", follow_redirects=False)
+        csrf = csrf_from_profile(client)
+        assert inspect.call_args.args[0] == "initial-token"
+        client.post("/refresh", data={"csrf_token": csrf})
+        assert inspect.call_args.args[0] == "replacement-token"
 
 
 @pytest.mark.parametrize("invalid_response", [True, False])
