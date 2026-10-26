@@ -8,9 +8,11 @@ tls-cert-path = "/tls/tls.crt"
 tls-key-path = "/tls/tls.key"
 
 [oidc]
-issuer = "https://id.noa.re"
-client-id = "oidc-client-demo"
-scopes = ["openid", "profile", "email", "offline_access"]
+issuer = "https://login.microsoftonline.com/1b5955bf-2426-4ced-8412-9fe81bb8bca4/v2.0"
+client-id = "82121173-5d45-4932-9067-8872b8735206"
+scopes = ["openid", "profile", "email", "offline_access", "api://0816f759-d89d-4319-a8d7-d88b5d751dc9/Full"]
+access-token-audiences = ["0816f759-d89d-4319-a8d7-d88b5d751dc9", "api://0816f759-d89d-4319-a8d7-d88b5d751dc9"]
+access-token-required-scopes = ["Full"]
 client-secret-path = "/secret/client_id"
 
 

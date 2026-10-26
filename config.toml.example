@@ -15,6 +15,12 @@ scopes = ["openid", "profile", "email"]
 # If your identity provider requires a client secret, store it in this file:
 # client-secret-path = "client-secret"
 
+# To inspect JWT access tokens for your own API, configure its accepted audience
+# identifiers (not this OIDC client's ID) and delegated scopes to require.
+# Entra v1 and v2 access tokens are supported with a tenant-GUID v2 OIDC issuer.
+# access-token-audiences = ["<api-application-id>", "api://<api-application-id>"]
+# access-token-required-scopes = ["Full"]
+
 # Optional request tracing via OTLP/HTTP (Tempo's HTTP receiver, usually port 4318).
 # [traces]
 # endpoint = "http://localhost:4318/v1/traces"
