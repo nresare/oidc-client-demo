@@ -24,6 +24,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from starlette.types import ASGIApp
 
+from oidc_client_demo.access_tokens import inspect_access_token
 from oidc_client_demo.auth import (
     OidcInitializationError,
     OidcTokenResponseError,
@@ -105,12 +106,16 @@ async def profile(request: Request) -> Response:
     if session_id not in request.app.state.token_store and request.session.get("refresh_token"):
         await refresh_session_tokens(request)
     record = session_tokens(request)
+    inspection = await inspect_access_token(
+        record.access_token, request.app.state.settings.oidc, get_oidc_metadata(request.app)
+    )
     return TEMPLATES.TemplateResponse(
         request,
         "profile.html",
         {
             "user": request.session["user"],
             "token": record,
+            "inspection": inspection,
             "has_refresh_token": bool(request.session.get("refresh_token")),
             "csrf_token": request.session.get("demo_csrf"),
         },

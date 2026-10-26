@@ -42,6 +42,27 @@
           <p class="meta">The server has no token record for this session. Sign in again to view token details and refresh access tokens.</p>
         {% endif %}
       </section>
+      <section class="profile-details" aria-labelledby="access-token-validation-title">
+        <h2 id="access-token-validation-title">Access token validation</h2>
+        <dl>
+          <dt>Status</dt><dd>{{ inspection.status }}</dd>
+          <dt>Result</dt><dd>{{ inspection.detail }}</dd>
+          {% if inspection.issuer %}
+            <dt>Expected issuer</dt><dd>{{ inspection.issuer }}</dd>
+          {% endif %}
+          {% if inspection.audiences %}
+            <dt>Accepted audiences</dt><dd>{{ inspection.audiences | join(", ") }}</dd>
+          {% endif %}
+        </dl>
+        {% if inspection.claims %}
+          <h3>Access token claims</h3>
+          {% if inspection.status != "Valid" %}
+            <p>Unverified claims: these values must not be trusted for authorization.</p>
+          {% endif %}
+          <pre class="token-claims">{{ inspection.claims | tojson(indent=2) }}</pre>
+        {% endif %}
+        <p class="meta">This is a diagnostic check for the configured API. Passing validation does not check picture ownership, MCP access roles, or other resource policies. Raw token values are never displayed.</p>
+      </section>
       <section class="actions" aria-label="Profile actions">
         <a class="button" href="/">Back home</a>
         <a class="button" href="/logout">Sign out</a>
