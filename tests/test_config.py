@@ -26,6 +26,28 @@ def test_load_config_defaults(tmp_path):
     assert config.oidc.scopes == ["openid", "profile", "email"]
 
 
+@pytest.mark.parametrize("name", ["access-token-audiences", "access-token-required-scopes"])
+@pytest.mark.parametrize("value", ['"not-a-list"', '[""]', "[123]"])
+def test_load_config_rejects_invalid_access_token_settings(tmp_path, name, value):
+    (tmp_path / "session-key").write_text("test-secret")
+    config_path = write_config(tmp_path)
+    with open(config_path, "a") as config_file:
+        config_file.write(f"{name} = {value}\n")
+    with pytest.raises(ValueError, match=name):
+        load_config(config_path)
+
+
+def test_load_config_reads_access_token_settings(tmp_path):
+    (tmp_path / "session-key").write_text("test-secret")
+    config_path = write_config(tmp_path)
+    with open(config_path, "a") as config_file:
+        config_file.write('access-token-audiences = ["api-id", "api://api-id"]\n')
+        config_file.write('access-token-required-scopes = ["Full"]\n')
+    config = load_config(config_path)
+    assert config.oidc.access_token_audiences == ["api-id", "api://api-id"]
+    assert config.oidc.access_token_required_scopes == ["Full"]
+
+
 def test_load_config_absolute_secret_path(tmp_path):
     secret_path = tmp_path / "mounted-key"
     secret_path.write_text("random-secret")

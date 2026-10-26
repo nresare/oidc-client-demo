@@ -13,7 +13,15 @@ CONFIG_PARAMETERS = {
     # Keep deprecated names here so their existing, more specific errors still apply.
     "app": {"secret-key", "secret-key-path", "base-url", "tls-cert-path", "tls-key-path"},
     "traces": {"endpoint", "service-name", "excluded-paths"},
-    "oidc": {"issuer", "client-id", "client-secret", "client-secret-path", "scopes"},
+    "oidc": {
+        "issuer",
+        "client-id",
+        "client-secret",
+        "client-secret-path",
+        "scopes",
+        "access-token-audiences",
+        "access-token-required-scopes",
+    },
 }
 
 
@@ -31,6 +39,8 @@ class OidcConfig:
     client_id: str
     client_secret: str | None = None
     scopes: list[str] = field(default_factory=lambda: ["openid", "profile", "email"])
+    access_token_audiences: list[str] = field(default_factory=list)
+    access_token_required_scopes: list[str] = field(default_factory=list)
 
     @property
     def server_metadata_url(self) -> str:
@@ -136,6 +146,11 @@ def load_config(config_path: str) -> Config:
             )
         traces = TracesConfig(endpoint=endpoint, service_name=service_name, excluded_paths=excluded_paths)
 
+    for name in ("access-token-audiences", "access-token-required-scopes"):
+        values = oidc_data.get(name, [])
+        if not isinstance(values, list) or any(not isinstance(value, str) or not value.strip() for value in values):
+            raise ValueError(f"Invalid oidc.{name}; expected a list of non-empty strings")
+
     return Config(
         traces=traces,
         app=AppConfig(
@@ -148,5 +163,7 @@ def load_config(config_path: str) -> Config:
             client_id=oidc_data["client-id"],
             client_secret=client_secret,
             scopes=oidc_data.get("scopes", ["openid", "profile", "email"]),
+            access_token_audiences=oidc_data.get("access-token-audiences", []),
+            access_token_required_scopes=oidc_data.get("access-token-required-scopes", []),
         ),
     )
